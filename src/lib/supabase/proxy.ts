@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "@/lib/database.types";
 
 const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
 
@@ -13,7 +14,7 @@ export async function updateSession(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

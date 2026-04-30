@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Admin.Clickstar.vn — Cổng quản trị vận hành",
+  title: "Portal.Clickstar.vn — Cổng quản trị vận hành",
   description:
     "Cổng quản trị vận hành dịch vụ và chăm sóc khách hàng cho Clickstar và khách hàng đã ký hợp đồng.",
 };

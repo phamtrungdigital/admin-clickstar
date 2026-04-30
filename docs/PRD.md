@@ -1,12 +1,12 @@
-# Admin.Clickstar.vn — Product Requirements
+# Portal.Clickstar.vn — Product Requirements
 
-> Tên sản phẩm: **Admin.Clickstar.vn**
+> Tên sản phẩm: **Portal.Clickstar.vn**
 >
 > Mục tiêu: Xây dựng cổng quản trị vận hành dịch vụ, chăm sóc khách hàng, quản lý hợp đồng, tài liệu, ticket, báo cáo tiến độ và automation cho nội bộ Clickstar và khách hàng.
 
 ## 1. Định hướng sản phẩm
 
-Admin.Clickstar.vn **không phải CRM thuần túy**. Đây là hệ thống **Client Operation Portal** gồm:
+Portal.Clickstar.vn **không phải CRM thuần túy**. Đây là hệ thống **Client Operation Portal** gồm:
 
 - Quản trị khách hàng
 - Quản trị hợp đồng
@@ -231,4 +231,4 @@ Khi code cần ưu tiên:
 
 ---
 
-**Kết luận:** Admin.Clickstar.vn là cổng vận hành dịch vụ và chăm sóc khách hàng cho Clickstar. Giai đoạn đầu ưu tiên xây nền tảng quản trị khách hàng, hợp đồng, tài liệu, ticket, tiến độ và portal khách hàng. Sau đó mở rộng Email, ZNS, n8n automation và AI hỗ trợ báo cáo.
+**Kết luận:** Portal.Clickstar.vn là cổng vận hành dịch vụ và chăm sóc khách hàng cho Clickstar. Giai đoạn đầu ưu tiên xây nền tảng quản trị khách hàng, hợp đồng, tài liệu, ticket, tiến độ và portal khách hàng. Sau đó mở rộng Email, ZNS, n8n automation và AI hỗ trợ báo cáo.

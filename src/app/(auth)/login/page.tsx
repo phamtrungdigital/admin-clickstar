@@ -13,7 +13,7 @@ import { ClickstarLogo } from "@/components/clickstar-logo";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
-  title: "Đăng nhập | Admin.Clickstar.vn",
+  title: "Đăng nhập | Portal.Clickstar.vn",
   description:
     "Cổng quản trị vận hành dịch vụ và chăm sóc khách hàng của Clickstar.",
 };
@@ -61,7 +61,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <h1 className="text-3xl font-bold text-slate-900">Đăng nhập</h1>
             <p className="text-sm text-slate-500">
-              Chào mừng bạn quay trở lại Admin.Clickstar.vn
+              Chào mừng bạn quay trở lại Portal.Clickstar.vn
             </p>
           </div>
 

@@ -1,0 +1,81 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Bell, HelpCircle, Search } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import { UserMenu } from "./user-menu";
+
+export function HeaderBar({
+  fullName,
+  email,
+  avatarUrl,
+  role,
+  unreadNotifications = 0,
+}: {
+  fullName: string;
+  email: string;
+  avatarUrl: string | null;
+  role: string;
+  unreadNotifications?: number;
+}) {
+  const [shortcutLabel, setShortcutLabel] = useState("Ctrl K");
+  useEffect(() => {
+    setShortcutLabel(
+      typeof navigator !== "undefined" && /Mac|iPhone|iPod|iPad/i.test(navigator.platform)
+        ? "⌘ K"
+        : "Ctrl K",
+    );
+  }, []);
+
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-6 backdrop-blur">
+      <div className="relative flex-1 max-w-xl">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          placeholder="Tìm kiếm khách hàng, hợp đồng, ticket..."
+          className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-16 text-sm placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+        />
+        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+          {shortcutLabel}
+        </kbd>
+      </div>
+
+      <div className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          aria-label="Thông báo"
+          className={cn(
+            "relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500",
+            "hover:bg-slate-100 hover:text-slate-700",
+          )}
+        >
+          <Bell className="h-5 w-5" />
+          {unreadNotifications > 0 && (
+            <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+              {unreadNotifications > 99 ? "99+" : unreadNotifications}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          aria-label="Trợ giúp"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <HelpCircle className="h-5 w-5" />
+        </button>
+
+        <Separator orientation="vertical" className="mx-2 h-6" />
+
+        <UserMenu
+          fullName={fullName}
+          email={email}
+          avatarUrl={avatarUrl}
+          role={role}
+        />
+      </div>
+    </header>
+  );
+}

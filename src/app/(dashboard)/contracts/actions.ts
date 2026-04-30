@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "node:crypto";
 
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -152,50 +151,9 @@ export async function softDeleteContractAction(
   return { ok: true };
 }
 
-const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
-
-/**
- * Receives a multipart upload from the contract form, stores the file in
- * the documents bucket and returns the storage object path. The path is
- * later saved on contracts.attachment_url; download URLs are signed on
- * demand by getContractAttachmentUrlAction.
- */
-export async function uploadContractAttachmentAction(
-  formData: FormData,
-): Promise<ContractActionResult<{ path: string; filename: string }>> {
-  const file = formData.get("file");
-  const companyId = formData.get("company_id");
-
-  if (!(file instanceof File)) {
-    return { ok: false, message: "Không nhận được tệp" };
-  }
-  if (typeof companyId !== "string" || !companyId) {
-    return { ok: false, message: "Thiếu company_id" };
-  }
-  if (file.type !== "application/pdf") {
-    return { ok: false, message: "Chỉ hỗ trợ tệp PDF" };
-  }
-  if (file.size > MAX_PDF_BYTES) {
-    return { ok: false, message: `Tệp quá ${MAX_PDF_BYTES / 1024 / 1024} MB` };
-  }
-
-  const supabase = await createClient();
-  const extension = file.name.split(".").pop() || "pdf";
-  const path = `companies/${companyId}/contracts/${randomUUID()}.${extension}`;
-
-  const { error } = await supabase.storage
-    .from("documents")
-    .upload(path, file, {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (error) {
-    return { ok: false, message: `Không upload được: ${error.message}` };
-  }
-
-  return { ok: true, data: { path, filename: file.name } };
-}
+// PDF uploads are performed directly from the browser via supabase-js
+// (see src/components/contracts/contract-attachment-field.tsx). That
+// path bypasses Next.js server-action body limits and is faster.
 
 export async function getContractAttachmentUrlAction(
   contractId: string,

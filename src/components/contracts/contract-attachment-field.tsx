@@ -7,13 +7,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { uploadContractAttachmentAction } from "@/app/(dashboard)/contracts/actions";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export type AttachmentValue = {
   url: string;
   filename: string;
 };
+
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export function ContractAttachmentField({
   companyId,
@@ -36,30 +38,47 @@ export function ContractAttachmentField({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const inputEl = e.target;
+
     if (!companyId) {
       toast.error("Vui lòng chọn khách hàng trước khi upload");
-      e.target.value = "";
+      inputEl.value = "";
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      toast.error("Chỉ hỗ trợ tệp PDF");
+      inputEl.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error(`Tệp quá ${MAX_BYTES / 1024 / 1024} MB`);
+      inputEl.value = "";
       return;
     }
 
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("company_id", companyId);
-
     startTransition(async () => {
-      const result = await uploadContractAttachmentAction(fd);
-      if (!result.ok) {
-        toast.error(result.message);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+      const supabase = createClient();
+      const ext = (file.name.split(".").pop() || "pdf").toLowerCase();
+      const path = `companies/${companyId}/contracts/${crypto.randomUUID()}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from("documents")
+        .upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+          cacheControl: "3600",
+        });
+
+      if (error) {
+        toast.error(`Không upload được: ${error.message}`);
+        inputEl.value = "";
         return;
       }
-      onChange({
-        url: result.data!.path,
-        filename: result.data!.filename,
-      });
+
+      onChange({ url: path, filename: file.name });
       setExternalUrl("");
       toast.success("Đã upload tệp PDF");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      inputEl.value = "";
     });
   };
 
@@ -100,7 +119,11 @@ export function ContractAttachmentField({
                 : "bg-blue-50 text-blue-600",
             )}
           >
-            {isUploaded ? <FileText className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+            {isUploaded ? (
+              <FileText className="h-4 w-4" />
+            ) : (
+              <ExternalLink className="h-4 w-4" />
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-slate-900">

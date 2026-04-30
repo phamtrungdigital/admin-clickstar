@@ -65,13 +65,13 @@ export function ServiceRowMenu({
         <MoreVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem onSelect={() => router.push(`/services/${id}`)}>
+        <DropdownMenuItem onClick={() => router.push(`/services/${id}`)}>
           <Eye className="mr-2 h-4 w-4" /> Xem chi tiết
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push(`/services/${id}/edit`)}>
+        <DropdownMenuItem onClick={() => router.push(`/services/${id}/edit`)}>
           <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onToggle}>
+        <DropdownMenuItem onClick={onToggle}>
           {isActive ? (
             <>
               <PauseCircle className="mr-2 h-4 w-4" /> Tạm ngưng
@@ -83,7 +83,7 @@ export function ServiceRowMenu({
           )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+        <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" /> Xoá
         </DropdownMenuItem>
       </DropdownMenuContent>

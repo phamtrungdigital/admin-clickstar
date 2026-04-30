@@ -52,14 +52,14 @@ export function ContractRowMenu({
         <MoreVertical className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
-        <DropdownMenuItem onSelect={() => router.push(`/contracts/${id}`)}>
+        <DropdownMenuItem onClick={() => router.push(`/contracts/${id}`)}>
           <Eye className="mr-2 h-4 w-4" /> Xem chi tiết
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push(`/contracts/${id}/edit`)}>
+        <DropdownMenuItem onClick={() => router.push(`/contracts/${id}/edit`)}>
           <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+        <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 className="mr-2 h-4 w-4" /> Xoá
         </DropdownMenuItem>
       </DropdownMenuContent>

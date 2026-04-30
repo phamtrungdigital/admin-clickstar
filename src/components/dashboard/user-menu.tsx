@@ -90,18 +90,18 @@ export function UserMenu({
           <p className="text-xs text-slate-500 font-normal truncate">{email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => router.push("/settings")}>
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
           <UserCog className="mr-2 h-4 w-4" />
           Hồ sơ cá nhân
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push("/settings")}>
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           Cài đặt
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          onSelect={onSignOut}
+          onClick={onSignOut}
           disabled={isPending}
         >
           <LogOut className="mr-2 h-4 w-4" />

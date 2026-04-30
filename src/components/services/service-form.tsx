@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  BILLING_CYCLE_SUGGESTIONS,
   SERVICE_CATEGORY_SUGGESTIONS,
   createServiceSchema,
   type CreateServiceInput,
@@ -57,8 +56,6 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
       code: defaultValues?.code ?? "",
       category: defaultValues?.category ?? "",
       description: defaultValues?.description ?? "",
-      default_price: defaultValues?.default_price ?? 0,
-      billing_cycle: defaultValues?.billing_cycle ?? "",
       is_active: defaultValues?.is_active ?? true,
     },
   });
@@ -147,68 +144,6 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
               {...register("description")}
               rows={3}
               placeholder="Mô tả ngắn về phạm vi dịch vụ, đối tượng khách phù hợp, ..."
-            />
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection
-        title="Giá & chu kỳ thanh toán"
-        description="Mức giá gợi ý và chu kỳ mặc định khi gắn dịch vụ vào hợp đồng."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label="Giá mặc định (VND)"
-            error={errors.default_price?.message}
-          >
-            <Controller
-              control={control}
-              name="default_price"
-              render={({ field }) => (
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  step="1000"
-                  min={0}
-                  value={field.value}
-                  onChange={(e) =>
-                    field.onChange(e.target.valueAsNumber || 0)
-                  }
-                  onBlur={field.onBlur}
-                />
-              )}
-            />
-            <p className="text-xs text-slate-500">
-              Để 0 nếu báo giá theo từng dự án.
-            </p>
-          </Field>
-          <Field label="Chu kỳ" error={errors.billing_cycle?.message}>
-            <Controller
-              control={control}
-              name="billing_cycle"
-              render={({ field }) => (
-                <Select
-                  value={field.value ? field.value : NO_VALUE}
-                  onValueChange={(v) => field.onChange(v === NO_VALUE ? "" : v)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn chu kỳ">
-                      {(value: string | null) => {
-                        if (!value || value === NO_VALUE) return "Không cố định";
-                        return value;
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_VALUE}>Không cố định</SelectItem>
-                    {BILLING_CYCLE_SUGGESTIONS.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
             />
           </Field>
         </div>

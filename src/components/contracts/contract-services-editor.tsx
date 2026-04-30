@@ -71,7 +71,6 @@ export function ContractServicesEditor({
 
       <div className="space-y-3">
         {services.map((line, idx) => {
-          const svc = optionsById.get(line.service_id);
           const subtotal = line.unit_price * line.quantity;
           return (
             <div
@@ -87,14 +86,7 @@ export function ContractServicesEditor({
                     value={line.service_id || undefined}
                     onValueChange={(v) => {
                       if (!v) return;
-                      const picked = optionsById.get(v);
-                      updateRow(idx, {
-                        service_id: v,
-                        unit_price:
-                          line.unit_price === 0 && picked
-                            ? Number(picked.default_price)
-                            : line.unit_price,
-                      });
+                      updateRow(idx, { service_id: v });
                     }}
                   >
                     <SelectTrigger className="mt-1 w-full">
@@ -116,11 +108,6 @@ export function ContractServicesEditor({
                       ))}
                     </SelectContent>
                   </Select>
-                  {svc?.billing_cycle && (
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      Chu kỳ gợi ý: {svc.billing_cycle}
-                    </p>
-                  )}
                 </div>
 
                 <div className="md:col-span-3">

@@ -180,8 +180,6 @@ export type ServiceOption = {
   name: string;
   code: string | null;
   category: string | null;
-  default_price: number;
-  billing_cycle: string | null;
 };
 
 /** Active services available for adding to a contract. */
@@ -189,7 +187,7 @@ export async function listActiveServicesForSelect(): Promise<ServiceOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, code, category, default_price, billing_cycle")
+    .select("id, name, code, category")
     .eq("is_active", true)
     .order("name");
   if (error) throw new Error(error.message);

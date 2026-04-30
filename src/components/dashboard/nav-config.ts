@@ -29,15 +29,7 @@ export const internalNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
   { label: "Khách hàng", href: "/customers", icon: Users },
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
-  {
-    label: "Dịch vụ",
-    href: "/services",
-    icon: Package,
-    children: [
-      { label: "Danh sách dịch vụ", href: "/services", icon: Package },
-      { label: "Danh mục dịch vụ", href: "/services/categories", icon: Package },
-    ],
-  },
+  { label: "Dịch vụ", href: "/services", icon: Package },
   { label: "Công việc", href: "/tasks", icon: ListChecks },
   { label: "Ticket", href: "/tickets", icon: Ticket },
   { label: "Tài liệu", href: "/documents", icon: FolderOpen },

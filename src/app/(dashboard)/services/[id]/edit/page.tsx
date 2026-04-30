@@ -34,8 +34,6 @@ export default async function EditServicePage({
           code: service.code ?? "",
           category: service.category ?? "",
           description: service.description ?? "",
-          default_price: Number(service.default_price),
-          billing_cycle: service.billing_cycle ?? "",
           is_active: service.is_active,
         }}
       />

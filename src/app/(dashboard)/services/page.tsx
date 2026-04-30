@@ -14,10 +14,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { ServiceFilters } from "@/components/services/service-filters";
 import { ServiceRowMenu } from "@/components/services/service-row-menu";
-import {
-  ServiceStatusBadge,
-  formatVnd,
-} from "@/components/services/service-status-badge";
+import { ServiceStatusBadge } from "@/components/services/service-status-badge";
 import { Pagination } from "@/components/customers/pagination";
 import {
   Table,
@@ -151,8 +148,6 @@ function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
           <TableRow>
             <TableHead>Dịch vụ</TableHead>
             <TableHead>Danh mục</TableHead>
-            <TableHead className="text-right">Giá (VND)</TableHead>
-            <TableHead>Chu kỳ</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead className="text-right">Đang sử dụng</TableHead>
             <TableHead className="w-12 text-right">{""}</TableHead>
@@ -176,12 +171,6 @@ function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
               </TableCell>
               <TableCell className="text-sm text-slate-600">
                 {row.category ?? <span className="text-slate-400">—</span>}
-              </TableCell>
-              <TableCell className="text-right font-medium text-slate-700">
-                {formatVnd(Number(row.default_price))}
-              </TableCell>
-              <TableCell className="text-sm text-slate-600">
-                {row.billing_cycle ?? <span className="text-slate-400">—</span>}
               </TableCell>
               <TableCell>
                 <ServiceStatusBadge isActive={row.is_active} />

@@ -1,15 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { Pencil, Tag, Wallet } from "lucide-react";
+import { Pencil, Tag } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
-import {
-  ServiceStatusBadge,
-  formatVnd,
-} from "@/components/services/service-status-badge";
+import { ServiceStatusBadge } from "@/components/services/service-status-badge";
 import { getServiceById } from "@/lib/queries/services";
 
 export const metadata = { title: "Chi tiết dịch vụ | Portal.Clickstar.vn" };
@@ -82,16 +79,6 @@ export default async function ServiceDetailPage({
             <h3 className="mb-4 text-sm font-semibold text-slate-900">Cấu hình</h3>
             <dl className="space-y-3 text-sm">
               <Row icon={Tag} label="Danh mục" value={service.category ?? "—"} />
-              <Row
-                icon={Wallet}
-                label="Giá mặc định"
-                value={formatVnd(Number(service.default_price))}
-              />
-              <Row
-                icon={Wallet}
-                label="Chu kỳ"
-                value={service.billing_cycle ?? "—"}
-              />
             </dl>
           </div>
 

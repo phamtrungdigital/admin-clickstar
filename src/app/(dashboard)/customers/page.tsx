@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { CompanyStatusBadge } from "@/components/dashboard/status-badge";
@@ -76,7 +77,10 @@ export default async function CustomersPage({
         actions={
           <Link
             href="/customers/new"
-            className={buttonVariants({ size: "lg", className: "bg-blue-600 hover:bg-blue-700 text-white px-4" })}
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "bg-blue-600 px-4 text-white hover:bg-blue-700",
+            )}
           >
             <Plus className="mr-2 h-4 w-4" /> Thêm khách hàng
           </Link>

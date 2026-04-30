@@ -13,9 +13,33 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { NavItem } from "./nav-config";
+import type { Audience, InternalRole } from "@/lib/database.types";
+import {
+  customerNav,
+  filterNavByRole,
+  internalNav,
+  type NavItem,
+} from "./nav-config";
 
-export function Sidebar({ items }: { items: NavItem[] }) {
+/**
+ * Server Components cannot pass function references (Lucide icon components)
+ * across the RSC boundary, so the Sidebar selects + filters nav items itself
+ * using the serializable `audience` + `internalRole` props.
+ */
+export function Sidebar({
+  audience,
+  internalRole,
+}: {
+  audience: Audience;
+  internalRole: InternalRole | null;
+}) {
+  const items = useMemo(
+    () =>
+      audience === "customer"
+        ? customerNav
+        : filterNavByRole(internalNav, internalRole),
+    [audience, internalRole],
+  );
   const pathname = usePathname();
 
   return (

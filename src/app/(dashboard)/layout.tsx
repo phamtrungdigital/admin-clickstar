@@ -1,11 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { HeaderBar } from "@/components/dashboard/header-bar";
-import {
-  customerNav,
-  filterNavByRole,
-  internalNav,
-} from "@/components/dashboard/nav-config";
 
 export default async function DashboardLayout({
   children,
@@ -16,17 +11,11 @@ export default async function DashboardLayout({
 
   const audience = profile?.audience ?? "internal";
   const internalRole = profile?.internal_role ?? null;
-
-  const navItems =
-    audience === "customer"
-      ? customerNav
-      : filterNavByRole(internalNav, internalRole);
-
   const role = audience === "customer" ? "viewer" : internalRole ?? "staff";
 
   return (
     <div className="flex h-svh w-full bg-slate-50/50">
-      <Sidebar items={navItems} />
+      <Sidebar audience={audience} internalRole={internalRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <HeaderBar
           fullName={profile?.full_name || email}

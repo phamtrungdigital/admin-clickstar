@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CompanyStatusBadge } from "@/components/dashboard/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,12 +47,18 @@ export default async function CustomerDetailPage({
         ]}
         actions={
           <>
-            <Link href="/customers" className={buttonVariants({ variant: "outline", size: "lg", className: "px-4" })}>
+            <Link
+              href="/customers"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "px-4")}
+            >
               Quay lại
             </Link>
             <Link
               href={`/customers/${customer.id}/edit`}
-              className={buttonVariants({ size: "lg", className: "bg-blue-600 hover:bg-blue-700 text-white px-4" })}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
             >
               <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
             </Link>

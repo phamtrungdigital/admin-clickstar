@@ -47,14 +47,14 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
       <Tabs
         value={audience}
         onValueChange={(v) =>
           setValue("audience", v as LoginInput["audience"], { shouldDirty: true })
         }
       >
-        <TabsList className="grid w-full grid-cols-2 bg-slate-100/80 p-1 h-11">
+        <TabsList className="grid w-full grid-cols-2 bg-slate-100/80 p-1 h-10">
           <TabsTrigger
             value="internal"
             className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm gap-2"
@@ -84,7 +84,7 @@ export function LoginForm() {
             autoComplete="username"
             placeholder="Nhập email hoặc số điện thoại"
             className={cn(
-              "h-12 pl-10 bg-slate-50/50",
+              "h-11 pl-10 bg-slate-50/50",
               errors.identifier && "border-red-500 focus-visible:ring-red-500/20",
             )}
             {...register("identifier")}
@@ -145,7 +145,7 @@ export function LoginForm() {
       <Button
         type="submit"
         disabled={isPending}
-        className="h-12 w-full bg-blue-600 hover:bg-blue-700 text-base font-medium shadow-sm gap-2"
+        className="h-11 w-full bg-blue-600 hover:bg-blue-700 text-base font-medium shadow-sm gap-2"
       >
         {isPending ? "Đang đăng nhập..." : "Đăng nhập"}
         {!isPending && <ArrowRight className="h-4 w-4" />}
@@ -164,7 +164,7 @@ export function LoginForm() {
         <Button
           type="button"
           variant="outline"
-          className="h-11 gap-2 border-slate-200"
+          className="h-10 gap-2 border-slate-200"
           disabled
         >
           <GoogleIcon />
@@ -173,7 +173,7 @@ export function LoginForm() {
         <Button
           type="button"
           variant="outline"
-          className="h-11 gap-2 border-slate-200"
+          className="h-10 gap-2 border-slate-200"
           disabled
         >
           <MicrosoftIcon />

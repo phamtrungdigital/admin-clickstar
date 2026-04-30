@@ -22,13 +22,12 @@ const features = [
   {
     icon: Users,
     title: "Quản trị tập trung",
-    description:
-      "Quản lý khách hàng, hợp đồng, dự án, công việc và tài liệu trên một nền tảng duy nhất.",
+    description: "Khách hàng, hợp đồng, dự án, công việc, tài liệu trên một nền tảng.",
   },
   {
     icon: MessageCircle,
     title: "Chăm sóc toàn diện",
-    description: "Tương tác & chăm sóc khách hàng qua Email, ZNS, Ticket và Automation.",
+    description: "Email, ZNS, Ticket và Automation cho mọi tương tác khách hàng.",
   },
   {
     icon: BarChart3,
@@ -44,10 +43,10 @@ const features = [
 
 export default function LoginPage() {
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
+    <div className="grid h-svh lg:grid-cols-2">
       <BrandPanel />
-      <div className="flex flex-col justify-center px-6 py-10 sm:px-10 lg:px-16">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+      <div className="flex flex-col justify-center px-6 py-6 sm:px-10 lg:px-12 lg:py-8">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
           <div className="flex justify-end">
             <button
               type="button"
@@ -59,7 +58,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-slate-900">Đăng nhập</h1>
+            <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">Đăng nhập</h1>
             <p className="text-sm text-slate-500">
               Chào mừng bạn quay trở lại Portal.Clickstar.vn
             </p>
@@ -86,7 +85,7 @@ export default function LoginPage() {
 
 function BrandPanel() {
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-blue-800 text-white lg:flex lg:flex-col lg:px-12 lg:py-10">
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-blue-800 text-white lg:flex lg:flex-col lg:px-10 lg:py-8 xl:px-12">
       <div
         aria-hidden
         className="absolute inset-0 opacity-[0.18]"
@@ -97,34 +96,33 @@ function BrandPanel() {
         }}
       />
 
-      <div className="relative z-10 flex flex-1 flex-col gap-10">
+      <div className="relative z-10 flex flex-1 flex-col gap-6">
         <ClickstarLogo variant="light" />
 
-        <div className="space-y-4">
-          <h2 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+        <div className="space-y-3">
+          <h2 className="text-3xl font-bold leading-tight tracking-tight xl:text-4xl">
             Quản trị hiệu quả
             <br />
             Vận hành <span className="text-blue-200">bứt phá</span>
           </h2>
-          <div className="h-1 w-16 rounded-full bg-blue-300/80" />
+          <div className="h-1 w-12 rounded-full bg-blue-300/80" />
           <p className="max-w-md text-sm leading-relaxed text-blue-50/90">
-            Nền tảng quản trị và chăm sóc khách hàng chuyên nghiệp dành cho nội bộ
-            Clickstar và khách hàng.
+            Nền tảng quản trị và chăm sóc khách hàng cho nội bộ Clickstar và khách hàng đã ký hợp đồng.
           </p>
         </div>
 
-        <ul className="space-y-3">
+        <ul className="space-y-2">
           {features.map((f) => (
             <li
               key={f.title}
-              className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm"
+              className="flex items-start gap-3 rounded-lg border border-white/15 bg-white/10 p-2.5 backdrop-blur-sm"
             >
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/20">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-white/20">
                 <f.icon className="h-4 w-4" />
               </span>
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold">{f.title}</p>
-                <p className="text-xs leading-relaxed text-blue-50/80">
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-sm font-semibold leading-tight">{f.title}</p>
+                <p className="text-xs leading-snug text-blue-50/80">
                   {f.description}
                 </p>
               </div>
@@ -132,9 +130,9 @@ function BrandPanel() {
           ))}
         </ul>
 
-        <div className="mt-auto flex flex-col gap-4 border-t border-white/15 pt-5 text-xs text-blue-50/80 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-auto flex flex-col gap-3 border-t border-white/15 pt-4 text-xs text-blue-50/80 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Clickstar. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5" /> Bảo mật dữ liệu
             </span>

@@ -22,7 +22,6 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CompanyStatusBadge } from "@/components/dashboard/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCustomerById } from "@/lib/queries/customers";
-import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Chi tiết khách hàng | Portal.Clickstar.vn" };
 

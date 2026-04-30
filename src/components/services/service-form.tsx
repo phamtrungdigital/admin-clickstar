@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -48,7 +48,6 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
     handleSubmit,
     control,
     setError,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<CreateServiceInput>({
@@ -63,6 +62,8 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
       is_active: defaultValues?.is_active ?? true,
     },
   });
+
+  const isActive = useWatch({ control, name: "is_active" });
 
   const onSubmit = (values: CreateServiceInput) => {
     startTransition(async () => {
@@ -216,7 +217,7 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
       <FormSection title="Trạng thái">
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <Checkbox
-            checked={watch("is_active")}
+            checked={isActive}
             onCheckedChange={(c) => setValue("is_active", c === true)}
           />
           <div>

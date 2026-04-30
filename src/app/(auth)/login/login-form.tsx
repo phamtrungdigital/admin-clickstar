@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, User } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ export function LoginForm() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -35,7 +35,8 @@ export function LoginForm() {
     },
   });
 
-  const audience = watch("audience");
+  const audience = useWatch({ control, name: "audience" });
+  const rememberMe = useWatch({ control, name: "rememberMe" });
 
   function onSubmit(values: LoginInput) {
     startTransition(async () => {
@@ -136,7 +137,7 @@ export function LoginForm() {
 
       <label className="flex items-center gap-2 text-sm text-slate-600 select-none">
         <Checkbox
-          checked={watch("rememberMe")}
+          checked={rememberMe}
           onCheckedChange={(c) => setValue("rememberMe", c === true)}
         />
         Ghi nhớ đăng nhập

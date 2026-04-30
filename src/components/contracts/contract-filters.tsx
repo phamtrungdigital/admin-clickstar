@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
 
@@ -16,17 +16,31 @@ import {
 import { CONTRACT_STATUS_OPTIONS } from "@/lib/validation/contracts";
 
 export function ContractFilters() {
+  const searchParams = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const initialStatus = searchParams.get("status") ?? "all";
+  return (
+    <ContractFiltersImpl
+      key={`${initialQ}|${initialStatus}`}
+      initialQ={initialQ}
+      initialStatus={initialStatus}
+    />
+  );
+}
+
+function ContractFiltersImpl({
+  initialQ,
+  initialStatus,
+}: {
+  initialQ: string;
+  initialStatus: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
-  const [status, setStatus] = useState(searchParams.get("status") ?? "all");
-
-  useEffect(() => {
-    setSearch(searchParams.get("q") ?? "");
-    setStatus(searchParams.get("status") ?? "all");
-  }, [searchParams]);
+  const [search, setSearch] = useState(initialQ);
+  const [status, setStatus] = useState(initialStatus);
 
   const apply = (next: { q?: string; status?: string | null }) => {
     const params = new URLSearchParams(searchParams.toString());

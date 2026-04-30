@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
 
@@ -21,19 +21,39 @@ const STATUS_OPTIONS = [
 ];
 
 export function ServiceFilters({ categories }: { categories: string[] }) {
+  const searchParams = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const initialStatus = searchParams.get("status") ?? "all";
+  const initialCategory = searchParams.get("category") ?? "all";
+  return (
+    <ServiceFiltersImpl
+      key={`${initialQ}|${initialStatus}|${initialCategory}`}
+      categories={categories}
+      initialQ={initialQ}
+      initialStatus={initialStatus}
+      initialCategory={initialCategory}
+    />
+  );
+}
+
+function ServiceFiltersImpl({
+  categories,
+  initialQ,
+  initialStatus,
+  initialCategory,
+}: {
+  categories: string[];
+  initialQ: string;
+  initialStatus: string;
+  initialCategory: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
-  const [status, setStatus] = useState(searchParams.get("status") ?? "all");
-  const [category, setCategory] = useState(searchParams.get("category") ?? "all");
-
-  useEffect(() => {
-    setSearch(searchParams.get("q") ?? "");
-    setStatus(searchParams.get("status") ?? "all");
-    setCategory(searchParams.get("category") ?? "all");
-  }, [searchParams]);
+  const [search, setSearch] = useState(initialQ);
+  const [status, setStatus] = useState(initialStatus);
+  const [category, setCategory] = useState(initialCategory);
 
   const apply = (next: { q?: string; status?: string | null; category?: string | null }) => {
     const params = new URLSearchParams(searchParams.toString());

@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Bell, HelpCircle, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { UserMenu } from "./user-menu";
+
+const subscribeNoop = () => () => {};
+const getShortcutLabelClient = () =>
+  /Mac|iPhone|iPod|iPad/i.test(navigator.platform) ? "⌘ K" : "Ctrl K";
+const getShortcutLabelServer = () => "Ctrl K";
 
 export function HeaderBar({
   fullName,
@@ -20,14 +25,11 @@ export function HeaderBar({
   role: string;
   unreadNotifications?: number;
 }) {
-  const [shortcutLabel, setShortcutLabel] = useState("Ctrl K");
-  useEffect(() => {
-    setShortcutLabel(
-      typeof navigator !== "undefined" && /Mac|iPhone|iPod|iPad/i.test(navigator.platform)
-        ? "⌘ K"
-        : "Ctrl K",
-    );
-  }, []);
+  const shortcutLabel = useSyncExternalStore(
+    subscribeNoop,
+    getShortcutLabelClient,
+    getShortcutLabelServer,
+  );
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-6 backdrop-blur">

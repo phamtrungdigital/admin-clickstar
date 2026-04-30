@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -55,7 +55,6 @@ export function ContractForm({
     handleSubmit,
     control,
     setError,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<CreateContractInput>({
@@ -78,8 +77,8 @@ export function ContractForm({
     },
   });
 
-  const companyId = watch("company_id");
-  const servicesValue = watch("services");
+  const companyId = useWatch({ control, name: "company_id" });
+  const servicesValue = useWatch({ control, name: "services" });
 
   const computedTotal = (servicesValue ?? []).reduce(
     (sum, s) => sum + (s.unit_price || 0) * (s.quantity || 0),

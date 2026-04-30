@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw, Search } from "lucide-react";
 
@@ -23,18 +23,31 @@ const STATUS_FILTER_OPTIONS = [
 ];
 
 export function CustomerFilters() {
+  const searchParams = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const initialStatus = searchParams.get("status") ?? "all";
+  return (
+    <CustomerFiltersImpl
+      key={`${initialQ}|${initialStatus}`}
+      initialQ={initialQ}
+      initialStatus={initialStatus}
+    />
+  );
+}
+
+function CustomerFiltersImpl({
+  initialQ,
+  initialStatus,
+}: {
+  initialQ: string;
+  initialStatus: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [search, setSearch] = useState(searchParams.get("q") ?? "");
-  const [status, setStatus] = useState(searchParams.get("status") ?? "all");
-
-  // Sync state when URL changes (e.g., after reset)
-  useEffect(() => {
-    setSearch(searchParams.get("q") ?? "");
-    setStatus(searchParams.get("status") ?? "all");
-  }, [searchParams]);
+  const [search, setSearch] = useState(initialQ);
+  const [status, setStatus] = useState(initialStatus);
 
   const apply = (next: { q?: string | null; status?: string | null }) => {
     const params = new URLSearchParams(searchParams.toString());

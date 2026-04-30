@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Headphones } from "lucide-react";
@@ -72,11 +72,14 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
     [hasChildren, item.children, pathname],
   );
 
-  // Auto-open the section when one of its children is active
+  // Auto-open the section whenever a child becomes active.
+  // Uses the "store info from previous renders" pattern instead of useEffect.
   const [open, setOpen] = useState(childIsActive);
-  useEffect(() => {
+  const [prevChildIsActive, setPrevChildIsActive] = useState(childIsActive);
+  if (childIsActive !== prevChildIsActive) {
+    setPrevChildIsActive(childIsActive);
     if (childIsActive) setOpen(true);
-  }, [childIsActive]);
+  }
 
   if (!hasChildren) {
     const Icon = item.icon;

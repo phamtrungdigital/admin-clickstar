@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,14 +33,28 @@ import { cn } from "@/lib/utils";
 
 const NO_MANAGER = "__none__";
 
+export type ServicePickOption = {
+  id: string;
+  name: string;
+  category: string | null;
+  code: string | null;
+};
+
 export type CustomerFormProps = {
   mode: "create" | "edit";
   customerId?: string;
   defaultValues?: Partial<CreateCompanyInput>;
   staff: Array<{ id: string; full_name: string; internal_role: string | null }>;
+  services: ServicePickOption[];
 };
 
-export function CustomerForm({ mode, customerId, defaultValues, staff }: CustomerFormProps) {
+export function CustomerForm({
+  mode,
+  customerId,
+  defaultValues,
+  staff,
+  services,
+}: CustomerFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -63,6 +79,7 @@ export function CustomerForm({ mode, customerId, defaultValues, staff }: Custome
       tax_code: defaultValues?.tax_code ?? "",
       primary_account_manager_id:
         defaultValues?.primary_account_manager_id ?? null,
+      service_ids: defaultValues?.service_ids ?? [],
     },
   });
 
@@ -186,6 +203,23 @@ export function CustomerForm({ mode, customerId, defaultValues, staff }: Custome
         </div>
       </FormSection>
 
+      <FormSection
+        title="Dịch vụ sử dụng"
+        description="Khách hàng có thể dùng nhiều dịch vụ — tích chọn các dịch vụ Clickstar đang/sẽ cung cấp."
+      >
+        <Controller
+          control={control}
+          name="service_ids"
+          render={({ field }) => (
+            <ServiceCheckboxGrid
+              services={services}
+              value={field.value ?? []}
+              onChange={field.onChange}
+            />
+          )}
+        />
+      </FormSection>
+
       <FormSection title="Phụ trách" description="Người chịu trách nhiệm chính cho tài khoản này từ phía Clickstar.">
         <Field
           label="Account Manager chính"
@@ -280,6 +314,92 @@ function Field({
       <Label className="text-sm font-medium text-slate-700">{label}</Label>
       {children}
       {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+const UNCATEGORIZED = "Chưa phân loại";
+
+function ServiceCheckboxGrid({
+  services,
+  value,
+  onChange,
+}: {
+  services: ServicePickOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  if (services.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50/50 p-6 text-center text-sm text-slate-500">
+        Chưa có dịch vụ nào trong catalog. Thêm dịch vụ tại{" "}
+        <Link
+          className="font-medium text-blue-600 hover:underline"
+          href="/services"
+        >
+          Dịch vụ
+        </Link>{" "}
+        rồi quay lại tích chọn.
+      </div>
+    );
+  }
+
+  const grouped = new Map<string, ServicePickOption[]>();
+  for (const s of services) {
+    const key = s.category || UNCATEGORIZED;
+    const arr = grouped.get(key) ?? [];
+    arr.push(s);
+    grouped.set(key, arr);
+  }
+  const selected = new Set(value);
+
+  const toggle = (id: string) => {
+    if (selected.has(id)) {
+      onChange(value.filter((v) => v !== id));
+    } else {
+      onChange([...value, id]);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {[...grouped.entries()].map(([category, items]) => (
+        <div key={category}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {category}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((s) => {
+              const checked = selected.has(s.id);
+              return (
+                <label
+                  key={s.id}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2.5 rounded-md border p-3 text-sm transition-colors",
+                    checked
+                      ? "border-blue-300 bg-blue-50/50"
+                      : "border-slate-200 bg-white hover:border-slate-300",
+                  )}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggle(s.id)}
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900">{s.name}</p>
+                    {s.code && (
+                      <p className="font-mono text-[11px] text-slate-500">
+                        {s.code}
+                      </p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

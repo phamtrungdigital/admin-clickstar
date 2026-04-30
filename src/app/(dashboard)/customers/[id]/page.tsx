@@ -92,7 +92,7 @@ export default async function CustomerDetailPage({
               <ComingSoonTab title="Hợp đồng" icon={FileSignature} phase="2" />
             </TabsContent>
             <TabsContent value="services" className="mt-4">
-              <ComingSoonTab title="Dịch vụ đang dùng" icon={Package} phase="2" />
+              <ServicesTab services={customer.services} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
               <ComingSoonTab title="Tài liệu" icon={FolderOpen} phase="2" />
@@ -271,6 +271,58 @@ function SidePanelCard({
     <div className="rounded-xl border border-slate-200 bg-white p-5">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function ServicesTab({
+  services,
+}: {
+  services: Array<{ id: string; name: string; category: string | null }>;
+}) {
+  if (services.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+        <Package className="mx-auto h-10 w-10 text-slate-300" />
+        <h3 className="mt-3 text-base font-semibold text-slate-900">
+          Chưa gắn dịch vụ
+        </h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+          Bấm <strong>Chỉnh sửa</strong> ở góc trên để tích chọn dịch vụ khách
+          hàng đang sử dụng.
+        </p>
+      </div>
+    );
+  }
+
+  const grouped = new Map<string, typeof services>();
+  for (const s of services) {
+    const key = s.category || "Chưa phân loại";
+    const arr = grouped.get(key) ?? [];
+    arr.push(s);
+    grouped.set(key, arr);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+      {[...grouped.entries()].map(([category, items]) => (
+        <div key={category}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {category}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {items.map((s) => (
+              <Link
+                key={s.id}
+                href={`/services/${s.id}`}
+                className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {s.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

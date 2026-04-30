@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CustomerForm } from "@/components/customers/customer-form";
-import { getCustomerById, listInternalStaff } from "@/lib/queries/customers";
+import {
+  getCustomerById,
+  listActiveServicesGrouped,
+  listInternalStaff,
+} from "@/lib/queries/customers";
 
 export const metadata = { title: "Sửa khách hàng | Portal.Clickstar.vn" };
 
@@ -12,9 +16,10 @@ export default async function EditCustomerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [customer, staff] = await Promise.all([
+  const [customer, staff, services] = await Promise.all([
     getCustomerById(id).catch(() => null),
     listInternalStaff().catch(() => []),
+    listActiveServicesGrouped().catch(() => []),
   ]);
 
   if (!customer) notFound();
@@ -46,8 +51,10 @@ export default async function EditCustomerPage({
           tax_code: customer.tax_code ?? "",
           primary_account_manager_id:
             customer.primary_account_manager?.id ?? null,
+          service_ids: customer.service_ids,
         }}
         staff={staff}
+        services={services}
       />
     </div>
   );

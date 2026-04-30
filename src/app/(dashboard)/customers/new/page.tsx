@@ -1,16 +1,17 @@
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CustomerForm } from "@/components/customers/customer-form";
-import { listInternalStaff } from "@/lib/queries/customers";
+import {
+  listActiveServicesGrouped,
+  listInternalStaff,
+} from "@/lib/queries/customers";
 
 export const metadata = { title: "Thêm khách hàng | Portal.Clickstar.vn" };
 
 export default async function NewCustomerPage() {
-  let staff: Awaited<ReturnType<typeof listInternalStaff>> = [];
-  try {
-    staff = await listInternalStaff();
-  } catch {
-    // Schema not applied yet; let the form render with an empty staff list.
-  }
+  const [staff, services] = await Promise.all([
+    listInternalStaff().catch(() => []),
+    listActiveServicesGrouped().catch(() => []),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -23,7 +24,7 @@ export default async function NewCustomerPage() {
           { label: "Thêm khách hàng" },
         ]}
       />
-      <CustomerForm mode="create" staff={staff} />
+      <CustomerForm mode="create" staff={staff} services={services} />
     </div>
   );
 }

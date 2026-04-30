@@ -43,7 +43,7 @@ export async function createCustomerAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
 
-  const { primary_account_manager_id, ...rest } = parsed.data;
+  const { primary_account_manager_id, service_ids, ...rest } = parsed.data;
   const payload = normalizeCompanyInput(rest);
 
   const { data: company, error } = await supabase
@@ -74,6 +74,23 @@ export async function createCustomerAction(
     }
   }
 
+  if (service_ids && service_ids.length > 0) {
+    const { error: svcErr } = await supabase
+      .from("company_services")
+      .insert(
+        service_ids.map((service_id) => ({
+          company_id: company.id,
+          service_id,
+        })),
+      );
+    if (svcErr) {
+      return {
+        ok: false,
+        message: `Đã tạo khách hàng nhưng chưa gắn được dịch vụ: ${svcErr.message}`,
+      };
+    }
+  }
+
   revalidatePath("/customers");
   return { ok: true, data: { id: company.id } };
 }
@@ -92,7 +109,7 @@ export async function updateCustomerAction(
   }
 
   const supabase = await createClient();
-  const { primary_account_manager_id, ...rest } = parsed.data;
+  const { primary_account_manager_id, service_ids, ...rest } = parsed.data;
   const payload = normalizeCompanyInput(rest);
 
   if (Object.keys(payload).length > 0) {
@@ -122,6 +139,24 @@ export async function updateCustomerAction(
           role: "account_manager",
           is_primary: true,
         });
+      if (insertErr) return { ok: false, message: insertErr.message };
+    }
+  }
+
+  if (service_ids !== undefined) {
+    // Replace the entire set: delete all then insert the new selection.
+    const { error: clearErr } = await supabase
+      .from("company_services")
+      .delete()
+      .eq("company_id", id);
+    if (clearErr) return { ok: false, message: clearErr.message };
+
+    if (service_ids.length > 0) {
+      const { error: insertErr } = await supabase
+        .from("company_services")
+        .insert(
+          service_ids.map((service_id) => ({ company_id: id, service_id })),
+        );
       if (insertErr) return { ok: false, message: insertErr.message };
     }
   }

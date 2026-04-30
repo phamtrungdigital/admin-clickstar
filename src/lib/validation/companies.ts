@@ -31,6 +31,7 @@ export const createCompanySchema = z.object({
   address: trimmedString.max(1000),
   tax_code: trimmedString.max(255),
   primary_account_manager_id: z.string().uuid().nullable(),
+  service_ids: z.array(z.string().uuid()),
 });
 
 export const updateCompanySchema = createCompanySchema.partial();

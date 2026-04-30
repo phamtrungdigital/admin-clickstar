@@ -191,6 +191,12 @@ export interface ContractServiceRow extends Timestamps {
   notes: string | null;
 }
 
+export interface CompanyServiceRow {
+  company_id: string;
+  service_id: string;
+  created_at: string;
+}
+
 export interface ProjectRow extends Timestamps, SoftDeletable {
   id: string;
   company_id: string;
@@ -461,6 +467,12 @@ export interface Database {
         Row: ContractServiceRow;
         Insert: Insertable<ContractServiceRow>;
         Update: Updatable<ContractServiceRow>;
+        Relationships: [];
+      };
+      company_services: {
+        Row: CompanyServiceRow;
+        Insert: CompanyServiceRow;
+        Update: Partial<CompanyServiceRow>;
         Relationships: [];
       };
       projects: {

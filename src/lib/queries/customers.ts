@@ -126,6 +126,8 @@ export type CustomerDetail = CompanyRow & {
     is_primary: boolean;
     manager: { id: string; full_name: string } | null;
   }>;
+  service_ids: string[];
+  services: Array<{ id: string; name: string; category: string | null }>;
 };
 
 export async function getCustomerById(id: string): Promise<CustomerDetail | null> {
@@ -143,6 +145,13 @@ export async function getCustomerById(id: string): Promise<CustomerDetail | null
           id,
           full_name
         )
+      ),
+      company_services!company_services_company_id_fkey (
+        service:services!company_services_service_id_fkey (
+          id,
+          name,
+          category
+        )
       )
       `,
     )
@@ -159,22 +168,57 @@ export async function getCustomerById(id: string): Promise<CustomerDetail | null
     is_primary: boolean;
     manager: { id: string; full_name: string } | null;
   };
+  type ServiceLink = {
+    service: { id: string; name: string; category: string | null } | null;
+  };
   const assignments: Assignment[] =
     (data as { assignments?: Assignment[] }).assignments ?? [];
   const primary =
     assignments.find((a) => a.is_primary && a.role === "account_manager") ??
     assignments.find((a) => a.role === "account_manager") ??
     null;
+  const serviceLinks: ServiceLink[] =
+    (data as { company_services?: ServiceLink[] }).company_services ?? [];
+  const services = serviceLinks
+    .map((l) => l.service)
+    .filter((s): s is { id: string; name: string; category: string | null } => !!s);
 
-  const { assignments: _drop, ...rest } = data as CompanyRow & {
+  const {
+    assignments: _drop1,
+    company_services: _drop2,
+    ...rest
+  } = data as CompanyRow & {
     assignments?: Assignment[];
+    company_services?: ServiceLink[];
   };
-  void _drop;
+  void _drop1;
+  void _drop2;
   return {
     ...(rest as CompanyRow),
     primary_account_manager: primary?.manager ?? null,
     assignments,
+    service_ids: services.map((s) => s.id),
+    services,
   };
+}
+
+export async function listActiveServicesGrouped(): Promise<
+  Array<{ id: string; name: string; category: string | null; code: string | null }>
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("services")
+    .select("id, name, category, code")
+    .eq("is_active", true)
+    .order("category", { ascending: true, nullsFirst: false })
+    .order("name");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Array<{
+    id: string;
+    name: string;
+    category: string | null;
+    code: string | null;
+  }>;
 }
 
 export async function listInternalStaff(): Promise<

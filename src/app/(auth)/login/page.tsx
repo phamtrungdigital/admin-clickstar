@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import {
+  Activity,
   BarChart3,
+  Cpu,
   Globe,
   Headphones,
-  MessageCircle,
+  Headset,
+  Network,
+  Settings2,
+  Shield,
   ShieldCheck,
-  Users,
-  Activity,
 } from "lucide-react";
 
 import { ClickstarLogo } from "@/components/clickstar-logo";
@@ -20,30 +23,40 @@ export const metadata: Metadata = {
 
 const features = [
   {
-    icon: Users,
-    title: "Quản trị tập trung",
-    description: "Khách hàng, hợp đồng, dự án, công việc, tài liệu trên một nền tảng.",
+    icon: Cpu,
+    title: "AI thông minh",
+    description: "Ứng dụng trí tuệ nhân tạo để tối ưu vận hành.",
   },
   {
-    icon: MessageCircle,
-    title: "Chăm sóc toàn diện",
-    description: "Email, ZNS, Ticket và Automation cho mọi tương tác khách hàng.",
+    icon: Network,
+    title: "Hệ thống toàn diện",
+    description: "Quản trị tập trung, kết nối mọi quy trình.",
+  },
+  {
+    icon: Headset,
+    title: "Chăm sóc khách hàng",
+    description: "Hỗ trợ nhanh chóng, đa kênh, trải nghiệm vượt trội.",
   },
   {
     icon: BarChart3,
-    title: "Báo cáo thông minh",
-    description: "Theo dõi hiệu quả, tiến độ và doanh thu theo thời gian thực.",
+    title: "Báo cáo & phân tích",
+    description: "Dữ liệu trực quan, phân tích sâu, ra quyết định chính xác.",
   },
   {
-    icon: ShieldCheck,
-    title: "Bảo mật tuyệt đối",
-    description: "Phân quyền chặt chẽ, bảo mật dữ liệu và an toàn thông tin.",
+    icon: Shield,
+    title: "Bảo mật vượt trội",
+    description: "Bảo vệ dữ liệu toàn diện với tiêu chuẩn cao nhất.",
+  },
+  {
+    icon: Settings2,
+    title: "Tự động hóa",
+    description: "Tối ưu quy trình, tiết kiệm thời gian, nâng cao hiệu suất.",
   },
 ];
 
 export default function LoginPage() {
   return (
-    <div className="grid h-svh lg:grid-cols-2">
+    <div className="grid h-svh lg:grid-cols-[1.1fr_1fr]">
       <BrandPanel />
       <div className="flex flex-col justify-center px-6 py-6 sm:px-10 lg:px-12 lg:py-8">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -85,7 +98,8 @@ export default function LoginPage() {
 
 function BrandPanel() {
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-blue-800 text-white lg:flex lg:flex-col lg:px-10 lg:py-8 xl:px-12">
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#0052CC] via-[#0066E6] to-[#008CFF] text-white lg:flex lg:flex-col lg:px-10 lg:py-7 xl:px-14 xl:py-9">
+      {/* dot pattern */}
       <div
         aria-hidden
         className="absolute inset-0 opacity-[0.18]"
@@ -95,40 +109,36 @@ function BrandPanel() {
           backgroundSize: "24px 24px",
         }}
       />
+      {/* cyan glow accents */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-cyan-400/30 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-cyan-300/20 blur-3xl"
+      />
 
-      <div className="relative z-10 flex flex-1 flex-col gap-6">
-        <ClickstarLogo variant="light" />
+      <div className="relative z-10 flex flex-1 flex-col gap-5">
+        <ClickstarLogo variant="light" size="md" />
 
         <div className="space-y-3">
           <h2 className="text-3xl font-bold leading-tight tracking-tight xl:text-4xl">
             Quản trị hiệu quả
             <br />
-            Vận hành <span className="text-blue-200">bứt phá</span>
+            Vận hành <span className="text-cyan-300">bứt phá</span>
           </h2>
-          <div className="h-1 w-12 rounded-full bg-blue-300/80" />
+          <div className="h-1 w-12 rounded-full bg-cyan-300/80" />
           <p className="max-w-md text-sm leading-relaxed text-blue-50/90">
             Nền tảng quản trị và chăm sóc khách hàng cho nội bộ Clickstar và khách hàng đã ký hợp đồng.
           </p>
         </div>
 
-        <ul className="space-y-2">
+        <div className="grid grid-cols-3 gap-3">
           {features.map((f) => (
-            <li
-              key={f.title}
-              className="flex items-start gap-3 rounded-lg border border-white/15 bg-white/10 p-2.5 backdrop-blur-sm"
-            >
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-white/20">
-                <f.icon className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-semibold leading-tight">{f.title}</p>
-                <p className="text-xs leading-snug text-blue-50/80">
-                  {f.description}
-                </p>
-              </div>
-            </li>
+            <FeatureCard key={f.title} {...f} />
           ))}
-        </ul>
+        </div>
 
         <div className="mt-auto flex flex-col gap-3 border-t border-white/15 pt-4 text-xs text-blue-50/80 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Clickstar. All rights reserved.</p>
@@ -145,6 +155,28 @@ function BrandPanel() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/20 bg-white/[0.08] p-3.5 backdrop-blur-md transition-colors hover:bg-white/[0.12]">
+      <div className="mb-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/25">
+        <Icon className="h-4.5 w-4.5 text-cyan-200" strokeWidth={1.75} />
+      </div>
+      <p className="text-sm font-semibold leading-tight">{title}</p>
+      <p className="mt-1 text-[11px] leading-snug text-blue-50/75">
+        {description}
+      </p>
     </div>
   );
 }

@@ -172,6 +172,8 @@ export interface ServiceRow extends Timestamps {
   category: string | null;
   description: string | null;
   is_active: boolean;
+  default_price: number;
+  billing_cycle: string | null;
   metadata: Json;
 }
 

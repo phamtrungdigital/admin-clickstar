@@ -13,6 +13,10 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import {
+  getInternalDashboardStats,
+  type InternalDashboardStats,
+} from "@/lib/queries/dashboard";
 
 export const metadata: Metadata = {
   title: "Tổng quan | Portal.Clickstar.vn",
@@ -22,6 +26,10 @@ export default async function DashboardPage() {
   const { profile } = await getCurrentUser();
   const isInternal = profile?.audience !== "customer";
   const greeting = profile?.full_name?.split(" ").slice(-1)[0] || "bạn";
+
+  const stats = isInternal
+    ? await getInternalDashboardStats().catch(() => null)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -35,7 +43,7 @@ export default async function DashboardPage() {
         breadcrumb={[{ label: "Trang chủ" }, { label: "Tổng quan" }]}
       />
 
-      {isInternal ? <InternalSummary /> : <CustomerSummary />}
+      {isInternal ? <InternalSummary stats={stats} /> : <CustomerSummary />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <PlaceholderPanel
@@ -51,30 +59,32 @@ export default async function DashboardPage() {
   );
 }
 
-function InternalSummary() {
+function InternalSummary({ stats }: { stats: InternalDashboardStats | null }) {
+  const fmt = (n: number | undefined) =>
+    n === undefined ? "—" : n.toLocaleString("vi-VN");
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatsCard
         label="Khách hàng đang hoạt động"
-        value="—"
+        value={fmt(stats?.activeCustomers)}
         icon={Building2}
         tone="blue"
       />
       <StatsCard
         label="Hợp đồng đang chạy"
-        value="—"
+        value={fmt(stats?.activeContracts)}
         icon={FileSignature}
         tone="violet"
       />
       <StatsCard
         label="Ticket đang mở"
-        value="—"
+        value={fmt(stats?.openTickets)}
         icon={MessageSquare}
         tone="amber"
       />
       <StatsCard
         label="Công việc trễ hạn"
-        value="—"
+        value={fmt(stats?.overdueTasks)}
         icon={CircleAlert}
         tone="rose"
       />

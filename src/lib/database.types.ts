@@ -421,96 +421,115 @@ export interface Database {
         Row: ProfileRow;
         Insert: Insertable<ProfileRow>;
         Update: Updatable<ProfileRow>;
+        Relationships: [];
       };
       companies: {
         Row: CompanyRow;
         Insert: Insertable<CompanyRow>;
         Update: Updatable<CompanyRow>;
+        Relationships: [];
       };
       company_members: {
         Row: CompanyMemberRow;
         Insert: Insertable<CompanyMemberRow>;
         Update: Updatable<CompanyMemberRow>;
+        Relationships: [];
       };
       company_assignments: {
         Row: CompanyAssignmentRow;
         Insert: Insertable<CompanyAssignmentRow>;
         Update: Updatable<CompanyAssignmentRow>;
+        Relationships: [];
       };
       contracts: {
         Row: ContractRow;
         Insert: Insertable<ContractRow>;
         Update: Updatable<ContractRow>;
+        Relationships: [];
       };
       services: {
         Row: ServiceRow;
         Insert: Insertable<ServiceRow>;
         Update: Updatable<ServiceRow>;
+        Relationships: [];
       };
       contract_services: {
         Row: ContractServiceRow;
         Insert: Insertable<ContractServiceRow>;
         Update: Updatable<ContractServiceRow>;
+        Relationships: [];
       };
       projects: {
         Row: ProjectRow;
         Insert: Insertable<ProjectRow>;
         Update: Updatable<ProjectRow>;
+        Relationships: [];
       };
       tasks: {
         Row: TaskRow;
         Insert: Insertable<TaskRow>;
         Update: Updatable<TaskRow>;
+        Relationships: [];
       };
       task_comments: {
         Row: TaskCommentRow;
         Insert: Insertable<TaskCommentRow>;
         Update: Updatable<TaskCommentRow>;
+        Relationships: [];
       };
       tickets: {
         Row: TicketRow;
         Insert: Insertable<TicketRow>;
         Update: Updatable<TicketRow>;
+        Relationships: [];
       };
       ticket_comments: {
         Row: TicketCommentRow;
         Insert: Insertable<TicketCommentRow>;
         Update: Updatable<TicketCommentRow>;
+        Relationships: [];
       };
       documents: {
         Row: DocumentRow;
         Insert: Insertable<DocumentRow>;
         Update: Updatable<DocumentRow>;
+        Relationships: [];
       };
       email_templates: {
         Row: EmailTemplateRow;
         Insert: Insertable<EmailTemplateRow>;
         Update: Updatable<EmailTemplateRow>;
+        Relationships: [];
       };
       email_campaigns: {
         Row: EmailCampaignRow;
         Insert: Insertable<EmailCampaignRow>;
         Update: Updatable<EmailCampaignRow>;
+        Relationships: [];
       };
       email_logs: {
         Row: EmailLogRow;
         Insert: Insertable<EmailLogRow>;
         Update: Updatable<EmailLogRow>;
+        Relationships: [];
       };
       zns_templates: {
         Row: ZnsTemplateRow;
         Insert: Insertable<ZnsTemplateRow>;
         Update: Updatable<ZnsTemplateRow>;
+        Relationships: [];
       };
       zns_logs: {
         Row: ZnsLogRow;
         Insert: Insertable<ZnsLogRow>;
         Update: Updatable<ZnsLogRow>;
+        Relationships: [];
       };
       reports: {
         Row: ReportRow;
         Insert: Insertable<ReportRow>;
         Update: Updatable<ReportRow>;
+        Relationships: [];
       };
       notifications: {
         Row: NotificationRow;
@@ -519,11 +538,13 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<NotificationRow>;
+        Relationships: [];
       };
       automation_events: {
         Row: AutomationEventRow;
         Insert: Insertable<AutomationEventRow>;
         Update: Updatable<AutomationEventRow>;
+        Relationships: [];
       };
       audit_logs: {
         Row: AuditLogRow;
@@ -532,6 +553,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<AuditLogRow>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

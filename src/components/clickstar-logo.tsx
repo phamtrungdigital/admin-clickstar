@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Star } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export function ClickstarLogo({
   variant = "dark",
@@ -31,7 +31,7 @@ export function ClickstarLogo({
         >
           CLICK
         </span>
-        <Star
+        <Sparkles
           className={cn(
             "fill-current",
             sizes.icon,

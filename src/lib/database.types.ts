@@ -161,6 +161,8 @@ export interface ContractRow extends Timestamps, SoftDeletable {
   ends_at: string | null;
   status: ContractStatus;
   notes: string | null;
+  attachment_url: string | null;
+  attachment_filename: string | null;
   metadata: Json;
   created_by: string | null;
 }

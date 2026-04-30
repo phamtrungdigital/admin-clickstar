@@ -44,8 +44,8 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 px-5 py-5">
-        <ClickstarLogo variant="light" />
+      <div className="flex h-16 items-center border-b border-slate-200 px-5">
+        <ClickstarLogo variant="dark" size="sm" showTagline={false} />
       </div>
 
       <ScrollArea className="flex-1 px-3 py-4">

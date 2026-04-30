@@ -149,8 +149,9 @@ export function ContractServicesEditor({
                   <Input
                     className="mt-1"
                     type="number"
+                    inputMode="numeric"
                     step="1"
-                    min={0.01}
+                    min={1}
                     value={line.quantity}
                     onChange={(e) =>
                       updateRow(idx, {

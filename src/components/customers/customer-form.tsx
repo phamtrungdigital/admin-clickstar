@@ -115,7 +115,15 @@ export function CustomerForm({ mode, customerId, defaultValues, staff }: Custome
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn trạng thái" />
+                    <SelectValue placeholder="Chọn trạng thái">
+                      {(value: string | null) => {
+                        if (!value) return null;
+                        return (
+                          COMPANY_STATUS_OPTIONS.find((o) => o.value === value)
+                            ?.label ?? value
+                        );
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {COMPANY_STATUS_OPTIONS.map((opt) => (
@@ -192,7 +200,13 @@ export function CustomerForm({ mode, customerId, defaultValues, staff }: Custome
                 onValueChange={(v) => field.onChange(v === NO_MANAGER ? null : v)}
               >
                 <SelectTrigger className="w-full max-w-md">
-                  <SelectValue placeholder="Chưa phân công" />
+                  <SelectValue placeholder="Chưa phân công">
+                    {(value: string | null) => {
+                      if (!value || value === NO_MANAGER) return "Chưa phân công";
+                      const member = staff.find((s) => s.id === value);
+                      return member?.full_name || "(chưa đặt tên)";
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_MANAGER}>Chưa phân công</SelectItem>

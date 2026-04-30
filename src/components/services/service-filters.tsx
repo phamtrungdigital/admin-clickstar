@@ -78,7 +78,11 @@ export function ServiceFilters({ categories }: { categories: string[] }) {
         <label className="text-xs font-medium text-slate-500">Danh mục</label>
         <Select value={category} onValueChange={(v) => apply({ category: v })}>
           <SelectTrigger className="mt-1 w-full">
-            <SelectValue />
+            <SelectValue>
+              {(value: string | null) =>
+                !value || value === "all" ? "Tất cả danh mục" : value
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả danh mục</SelectItem>
@@ -94,7 +98,11 @@ export function ServiceFilters({ categories }: { categories: string[] }) {
         <label className="text-xs font-medium text-slate-500">Trạng thái</label>
         <Select value={status} onValueChange={(v) => apply({ status: v })}>
           <SelectTrigger className="mt-1 w-full">
-            <SelectValue />
+            <SelectValue>
+              {(value: string | null) =>
+                STATUS_OPTIONS.find((o) => o.value === value)?.label ?? "—"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map((opt) => (

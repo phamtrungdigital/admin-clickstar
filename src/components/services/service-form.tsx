@@ -122,7 +122,12 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
                   onValueChange={(v) => field.onChange(v === NO_VALUE ? "" : v)}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn danh mục" />
+                    <SelectValue placeholder="Chọn danh mục">
+                      {(value: string | null) => {
+                        if (!value || value === NO_VALUE) return "Không phân loại";
+                        return value;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_VALUE}>Không phân loại</SelectItem>
@@ -186,7 +191,12 @@ export function ServiceForm({ mode, serviceId, defaultValues }: ServiceFormProps
                   onValueChange={(v) => field.onChange(v === NO_VALUE ? "" : v)}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn chu kỳ" />
+                    <SelectValue placeholder="Chọn chu kỳ">
+                      {(value: string | null) => {
+                        if (!value || value === NO_VALUE) return "Không cố định";
+                        return value;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_VALUE}>Không cố định</SelectItem>

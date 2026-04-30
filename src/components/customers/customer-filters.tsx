@@ -75,7 +75,11 @@ export function CustomerFilters() {
         <label className="text-xs font-medium text-slate-500">Trạng thái</label>
         <Select value={status} onValueChange={(v) => apply({ status: v })}>
           <SelectTrigger className="mt-1 w-full">
-            <SelectValue />
+            <SelectValue>
+              {(value: string | null) =>
+                STATUS_FILTER_OPTIONS.find((o) => o.value === value)?.label ?? "—"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {STATUS_FILTER_OPTIONS.map((opt) => (

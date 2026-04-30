@@ -67,7 +67,15 @@ export function ContractFilters() {
         <label className="text-xs font-medium text-slate-500">Trạng thái</label>
         <Select value={status} onValueChange={(v) => apply({ status: v })}>
           <SelectTrigger className="mt-1 w-full">
-            <SelectValue />
+            <SelectValue>
+              {(value: string | null) => {
+                if (!value || value === "all") return "Tất cả trạng thái";
+                return (
+                  CONTRACT_STATUS_OPTIONS.find((o) => o.value === value)?.label ??
+                  value
+                );
+              }}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tất cả trạng thái</SelectItem>

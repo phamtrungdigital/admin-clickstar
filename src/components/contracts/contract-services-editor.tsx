@@ -98,7 +98,14 @@ export function ContractServicesEditor({
                     }}
                   >
                     <SelectTrigger className="mt-1 w-full">
-                      <SelectValue placeholder="Chọn dịch vụ" />
+                      <SelectValue placeholder="Chọn dịch vụ">
+                        {(value: string | null) => {
+                          if (!value) return null;
+                          const o = optionsById.get(value);
+                          if (!o) return value;
+                          return o.category ? `${o.name} · ${o.category}` : o.name;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {options.map((o) => (

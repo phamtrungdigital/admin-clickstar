@@ -141,7 +141,14 @@ export function ContractForm({
                   onValueChange={field.onChange}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn khách hàng" />
+                    <SelectValue placeholder="Chọn khách hàng">
+                      {(value: string | null) => {
+                        if (!value) return null;
+                        const c = companies.find((co) => co.id === value);
+                        if (!c) return value;
+                        return c.code ? `${c.name} · ${c.code}` : c.name;
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((c) => (
@@ -165,7 +172,15 @@ export function ContractForm({
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn trạng thái" />
+                    <SelectValue placeholder="Chọn trạng thái">
+                      {(value: string | null) => {
+                        if (!value) return null;
+                        return (
+                          CONTRACT_STATUS_OPTIONS.find((o) => o.value === value)
+                            ?.label ?? value
+                        );
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {CONTRACT_STATUS_OPTIONS.map((opt) => (

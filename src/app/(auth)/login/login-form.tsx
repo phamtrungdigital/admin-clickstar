@@ -48,14 +48,14 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
       <Tabs
         value={audience}
         onValueChange={(v) =>
           setValue("audience", v as LoginInput["audience"], { shouldDirty: true })
         }
       >
-        <TabsList className="grid w-full grid-cols-2 bg-slate-100/80 p-1 h-10">
+        <TabsList className="grid w-full grid-cols-2 bg-slate-100/80 p-1 h-11">
           <TabsTrigger
             value="internal"
             className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm gap-2"
@@ -116,7 +116,7 @@ export function LoginForm() {
             autoComplete="current-password"
             placeholder="Nhập mật khẩu"
             className={cn(
-              "h-12 pl-10 pr-10 bg-slate-50/50",
+              "h-11 pl-10 pr-10 bg-slate-50/50",
               errors.password && "border-red-500 focus-visible:ring-red-500/20",
             )}
             {...register("password")}
@@ -146,41 +146,11 @@ export function LoginForm() {
       <Button
         type="submit"
         disabled={isPending}
-        className="h-11 w-full bg-blue-600 hover:bg-blue-700 text-base font-medium shadow-sm gap-2"
+        className="mt-1 h-11 w-full bg-blue-600 hover:bg-blue-700 text-base font-medium shadow-sm gap-2"
       >
         {isPending ? "Đang đăng nhập..." : "Đăng nhập"}
         {!isPending && <ArrowRight className="h-4 w-4" />}
       </Button>
-
-      <div className="relative my-1">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-slate-200" />
-        </div>
-        <div className="relative flex justify-center text-xs">
-          <span className="bg-white px-3 text-slate-500">Hoặc đăng nhập với</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 gap-2 border-slate-200"
-          disabled
-        >
-          <GoogleIcon />
-          Google
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 gap-2 border-slate-200"
-          disabled
-        >
-          <MicrosoftIcon />
-          Microsoft
-        </Button>
-      </div>
     </form>
   );
 }
@@ -195,24 +165,3 @@ function BuildingIcon() {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4">
-      <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3-3C17.2 1.7 14.7.5 12 .5 7.4.5 3.4 3.1 1.4 7l3.5 2.7C5.9 6.9 8.7 5 12 5z" />
-      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.4-1.2 2.6-2.4 3.4l3.5 2.7c2-1.9 3.9-4.7 3.9-8.3z" />
-      <path fill="#FBBC04" d="M4.9 14.3c-.3-.7-.4-1.5-.4-2.3 0-.8.1-1.6.4-2.3L1.4 7C.5 8.5 0 10.2 0 12c0 1.8.5 3.5 1.4 5l3.5-2.7z" />
-      <path fill="#34A853" d="M12 23.5c3.2 0 5.9-1.1 7.9-2.9l-3.5-2.7c-1 .7-2.3 1.1-4.4 1.1-3.3 0-6.1-1.9-7.1-4.7L1.4 17c2 3.9 6 6.5 10.6 6.5z" />
-    </svg>
-  );
-}
-
-function MicrosoftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4">
-      <path fill="#F25022" d="M0 0h11.4v11.4H0z" />
-      <path fill="#7FBA00" d="M12.6 0H24v11.4H12.6z" />
-      <path fill="#00A4EF" d="M0 12.6h11.4V24H0z" />
-      <path fill="#FFB900" d="M12.6 12.6H24V24H12.6z" />
-    </svg>
-  );
-}

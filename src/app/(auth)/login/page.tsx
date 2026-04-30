@@ -59,7 +59,7 @@ export default function LoginPage() {
     <div className="grid h-svh lg:grid-cols-[1.1fr_1fr]">
       <BrandPanel />
       <div className="flex flex-col justify-center px-6 py-6 sm:px-10 lg:px-12 lg:py-8">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-6">
           <div className="flex justify-end">
             <button
               type="button"

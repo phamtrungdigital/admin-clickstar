@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import {
-  contractServiceLineSchema,
   createContractSchema,
   normalizeContractInput,
   updateContractSchema,
@@ -183,5 +182,3 @@ export async function getContractAttachmentUrlAction(
   }
   return { ok: true, data: { url: signed.signedUrl } };
 }
-
-export { contractServiceLineSchema };

@@ -55,17 +55,17 @@ export function LoginForm() {
           setValue("audience", v as LoginInput["audience"], { shouldDirty: true })
         }
       >
-        <TabsList className="grid w-full grid-cols-2 bg-slate-100/80 p-1 h-11">
+        <TabsList className="grid w-full grid-cols-2 group-data-horizontal/tabs:h-12 rounded-xl bg-slate-100 p-1.5">
           <TabsTrigger
             value="internal"
-            className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm gap-2"
+            className="rounded-lg gap-2 text-sm font-medium text-slate-500 data-active:text-slate-900 data-active:bg-white data-active:shadow-sm data-active:ring-1 data-active:ring-slate-200/80"
           >
             <User className="h-4 w-4" />
             Đăng nhập nội bộ
           </TabsTrigger>
           <TabsTrigger
             value="customer"
-            className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm gap-2"
+            className="rounded-lg gap-2 text-sm font-medium text-slate-500 data-active:text-slate-900 data-active:bg-white data-active:shadow-sm data-active:ring-1 data-active:ring-slate-200/80"
           >
             <BuildingIcon />
             Đăng nhập khách hàng

@@ -11,6 +11,28 @@ const PUBLIC_PATHS = [
   "/apple-icon",
 ];
 
+// Routes a `customer` audience may visit. Anything else (e.g. /contracts,
+// /customers, /admin/*, /email) is bounced back to /dashboard. Listing only
+// the *roots* — `/services/anything` is implicitly internal-only because
+// only `/services` itself is whitelisted.
+const CUSTOMER_ALLOWED_EXACT = new Set([
+  "/dashboard",
+  "/services",
+  "/tasks",
+  "/tickets",
+  "/documents",
+  "/reports",
+  "/settings",
+]);
+
+function isCustomerAllowed(pathname: string): boolean {
+  if (CUSTOMER_ALLOWED_EXACT.has(pathname)) return true;
+  // Allow nested ticket routes — customers create + view their own tickets.
+  if (pathname.startsWith("/tickets/new")) return true;
+  if (/^\/tickets\/[^/]+$/.test(pathname)) return true;
+  return false;
+}
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -49,6 +71,28 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
+  }
+
+  // Audience gate: bounce customers back to /dashboard when they visit a
+  // route outside their whitelist. Internal users see everything (subject
+  // to internal_role checks done deeper in pages/actions).
+  if (
+    user &&
+    !isPublic &&
+    pathname !== "/" &&
+    pathname !== "/dashboard" &&
+    !isCustomerAllowed(pathname)
+  ) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("audience")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile?.audience === "customer") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

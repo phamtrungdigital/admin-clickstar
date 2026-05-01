@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalAction } from "@/lib/auth/guards";
 import {
   createTicketSchema,
   normalizeTicketInput,
@@ -110,6 +111,8 @@ export async function updateTicketAction(
   id: string,
   input: UpdateTicketInput,
 ): Promise<TicketActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = updateTicketSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -169,6 +172,8 @@ export async function changeTicketStatusAction(
   id: string,
   status: TicketStatus,
 ): Promise<TicketActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   const {
     data: { user },
@@ -216,6 +221,8 @@ export async function changeTicketStatusAction(
 export async function softDeleteTicketAction(
   id: string,
 ): Promise<TicketActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   const { error } = await supabase
     .from("tickets")

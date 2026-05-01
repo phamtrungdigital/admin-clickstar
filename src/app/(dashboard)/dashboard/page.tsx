@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export default async function DashboardPage() {
   const { profile } = await getCurrentUser();
   const isInternal = profile?.audience !== "customer";
-  const greeting = profile?.full_name?.split(" ").slice(-1)[0] || "bạn";
+  const greeting = pickGreeting(profile?.full_name);
 
   const stats = isInternal
     ? await getInternalDashboardStats().catch(() => null)
@@ -116,6 +116,16 @@ function CustomerSummary() {
       />
     </div>
   );
+}
+
+// Strip parenthesised tags ("Trung Pham (Khách hàng)" → "Trung Pham") and
+// take the LAST remaining word as Vietnamese given name. Fall back to "bạn".
+function pickGreeting(fullName: string | null | undefined): string {
+  if (!fullName) return "bạn";
+  const cleaned = fullName.replace(/\([^)]*\)/g, " ").trim();
+  if (!cleaned) return "bạn";
+  const parts = cleaned.split(/\s+/);
+  return parts[parts.length - 1] || "bạn";
 }
 
 function PlaceholderPanel({ title, description }: { title: string; description: string }) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalAction } from "@/lib/auth/guards";
 import {
   createServiceSchema,
   normalizeServiceInput,
@@ -27,6 +28,8 @@ function flattenZodErrors(error: import("zod").ZodError): Record<string, string>
 export async function createServiceAction(
   input: CreateServiceInput,
 ): Promise<ServiceActionResult<{ id: string }>> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = createServiceSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -57,6 +60,8 @@ export async function updateServiceAction(
   id: string,
   input: UpdateServiceInput,
 ): Promise<ServiceActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = updateServiceSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -86,6 +91,8 @@ export async function toggleServiceActiveAction(
   id: string,
   next: boolean,
 ): Promise<ServiceActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   const { error } = await supabase
     .from("services")
@@ -101,6 +108,8 @@ export async function toggleServiceActiveAction(
 export async function deleteServiceAction(
   id: string,
 ): Promise<ServiceActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   // services has no deleted_at; hard-delete is allowed only when no
   // contract_services references the row (FK is ON DELETE RESTRICT).

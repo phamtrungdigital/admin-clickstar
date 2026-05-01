@@ -34,6 +34,8 @@ import {
   type TicketListItem,
 } from "@/lib/queries/tickets";
 import type { TicketPriority, TicketStatus } from "@/lib/database.types";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
 
 export const metadata = { title: "Ticket | Portal.Clickstar.vn" };
 
@@ -56,6 +58,9 @@ export default async function TicketsPage({
     (params.priority as TicketPriority | "all" | undefined) ?? "all";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
   const search = params.q ?? "";
+
+  const { profile } = await getCurrentUser();
+  const canManage = isInternal(profile);
 
   let stats = { total: 0, open: 0, in_progress: 0, resolved: 0 };
   let listResult: Awaited<ReturnType<typeof listTickets>> = {
@@ -129,7 +134,7 @@ export default async function TicketsPage({
       {loadError ? (
         <ErrorPanel message={loadError} />
       ) : (
-        <TicketTable rows={listResult.rows} />
+        <TicketTable rows={listResult.rows} canManage={canManage} />
       )}
 
       {!loadError && (
@@ -149,7 +154,13 @@ export default async function TicketsPage({
   );
 }
 
-function TicketTable({ rows }: { rows: TicketListItem[] }) {
+function TicketTable({
+  rows,
+  canManage,
+}: {
+  rows: TicketListItem[];
+  canManage: boolean;
+}) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
@@ -175,7 +186,7 @@ function TicketTable({ rows }: { rows: TicketListItem[] }) {
             <TableHead>Trạng thái</TableHead>
             <TableHead>Phụ trách</TableHead>
             <TableHead>Tạo lúc</TableHead>
-            <TableHead className="w-12 text-right">{""}</TableHead>
+            {canManage && <TableHead className="w-12 text-right">{""}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -198,12 +209,16 @@ function TicketTable({ rows }: { rows: TicketListItem[] }) {
               </TableCell>
               <TableCell className="text-sm text-slate-600">
                 {row.company ? (
-                  <Link
-                    href={`/customers/${row.company.id}`}
-                    className="hover:text-blue-700"
-                  >
-                    {row.company.name}
-                  </Link>
+                  canManage ? (
+                    <Link
+                      href={`/customers/${row.company.id}`}
+                      className="hover:text-blue-700"
+                    >
+                      {row.company.name}
+                    </Link>
+                  ) : (
+                    <span>{row.company.name}</span>
+                  )
                 ) : (
                   <span className="text-slate-400">—</span>
                 )}
@@ -222,13 +237,15 @@ function TicketTable({ rows }: { rows: TicketListItem[] }) {
               <TableCell className="text-sm text-slate-500">
                 {format(new Date(row.created_at), "dd/MM/yyyy")}
               </TableCell>
-              <TableCell className="text-right">
-                <TicketRowMenu
-                  id={row.id}
-                  title={row.title}
-                  currentStatus={row.status}
-                />
-              </TableCell>
+              {canManage && (
+                <TableCell className="text-right">
+                  <TicketRowMenu
+                    id={row.id}
+                    title={row.title}
+                    currentStatus={row.status}
+                  />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

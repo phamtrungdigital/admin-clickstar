@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalAction } from "@/lib/auth/guards";
 import {
   createContractSchema,
   normalizeContractInput,
@@ -40,6 +41,8 @@ function normalizeServiceLine(line: ContractServiceLineInput) {
 export async function createContractAction(
   input: CreateContractInput,
 ): Promise<ContractActionResult<{ id: string }>> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = createContractSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -105,6 +108,8 @@ export async function updateContractAction(
   id: string,
   input: UpdateContractInput,
 ): Promise<ContractActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = updateContractSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -155,6 +160,8 @@ export async function updateContractAction(
 export async function softDeleteContractAction(
   id: string,
 ): Promise<ContractActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   const {
     data: { user },

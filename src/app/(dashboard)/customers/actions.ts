@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { requireInternalAction } from "@/lib/auth/guards";
 import {
   createCompanySchema,
   normalizeCompanyInput,
@@ -29,6 +30,8 @@ function flattenZodErrors(error: import("zod").ZodError): Record<string, string>
 export async function createCustomerAction(
   input: CreateCompanyInput,
 ): Promise<ActionResult<{ id: string }>> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = createCompanySchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -113,6 +116,8 @@ export async function updateCustomerAction(
   id: string,
   input: UpdateCompanyInput,
 ): Promise<ActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const parsed = updateCompanySchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -181,6 +186,8 @@ export async function updateCustomerAction(
 }
 
 export async function softDeleteCustomerAction(id: string): Promise<ActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
   const supabase = await createClient();
   const {
     data: { user },

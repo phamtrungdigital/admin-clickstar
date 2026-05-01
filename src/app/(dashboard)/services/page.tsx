@@ -16,6 +16,8 @@ import { ServiceFilters } from "@/components/services/service-filters";
 import { ServiceRowMenu } from "@/components/services/service-row-menu";
 import { ServiceStatusBadge } from "@/components/services/service-status-badge";
 import { Pagination } from "@/components/customers/pagination";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
 import {
   Table,
   TableBody,
@@ -51,6 +53,9 @@ export default async function ServicesPage({
   const search = params.q ?? "";
   const category = params.category ?? "all";
 
+  const { profile } = await getCurrentUser();
+  const canManage = isInternal(profile);
+
   let stats = { total: 0, active: 0, paused: 0 };
   let listResult: Awaited<ReturnType<typeof listServices>> = {
     rows: [],
@@ -74,19 +79,28 @@ export default async function ServicesPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dịch vụ"
-        description="Danh mục dịch vụ Clickstar đang cung cấp."
-        breadcrumb={[{ label: "Trang chủ", href: "/dashboard" }, { label: "Dịch vụ" }]}
+        title={canManage ? "Dịch vụ" : "Dịch vụ đang dùng"}
+        description={
+          canManage
+            ? "Danh mục dịch vụ Clickstar đang cung cấp."
+            : "Các dịch vụ Clickstar đang cung cấp cho doanh nghiệp của bạn."
+        }
+        breadcrumb={[
+          { label: "Trang chủ", href: "/dashboard" },
+          { label: canManage ? "Dịch vụ" : "Dịch vụ đang dùng" },
+        ]}
         actions={
-          <Link
-            href="/services/new"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "bg-blue-600 px-4 text-white hover:bg-blue-700",
-            )}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Thêm dịch vụ
-          </Link>
+          canManage ? (
+            <Link
+              href="/services/new"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Thêm dịch vụ
+            </Link>
+          ) : null
         }
       />
 
@@ -107,7 +121,7 @@ export default async function ServicesPage({
       {loadError ? (
         <ErrorPanel message={loadError} />
       ) : (
-        <ServiceTable rows={listResult.rows} />
+        <ServiceTable rows={listResult.rows} canManage={canManage} />
       )}
 
       {!loadError && (
@@ -127,15 +141,29 @@ export default async function ServicesPage({
   );
 }
 
-function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
+function ServiceTable({
+  rows,
+  canManage,
+}: {
+  rows: ServiceListItem[];
+  canManage: boolean;
+}) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
         <Package className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">Chưa có dịch vụ</h3>
+        <h3 className="mt-3 text-base font-semibold text-slate-900">
+          {canManage ? "Chưa có dịch vụ" : "Chưa có dịch vụ nào đang dùng"}
+        </h3>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Bấm <strong>Thêm dịch vụ</strong> ở góc trên để khai báo dịch vụ Clickstar
-          cung cấp.
+          {canManage ? (
+            <>
+              Bấm <strong>Thêm dịch vụ</strong> ở góc trên để khai báo dịch vụ
+              Clickstar cung cấp.
+            </>
+          ) : (
+            "Khi Clickstar kích hoạt dịch vụ trong hợp đồng, danh sách sẽ hiện ở đây."
+          )}
         </p>
       </div>
     );
@@ -150,7 +178,7 @@ function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
             <TableHead>Danh mục</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead className="text-right">Đang sử dụng</TableHead>
-            <TableHead className="w-12 text-right">{""}</TableHead>
+            {canManage && <TableHead className="w-12 text-right">{""}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -158,12 +186,16 @@ function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
             <TableRow key={row.id}>
               <TableCell>
                 <div className="flex flex-col">
-                  <Link
-                    href={`/services/${row.id}`}
-                    className="font-medium text-slate-900 hover:text-blue-700"
-                  >
-                    {row.name}
-                  </Link>
+                  {canManage ? (
+                    <Link
+                      href={`/services/${row.id}`}
+                      className="font-medium text-slate-900 hover:text-blue-700"
+                    >
+                      {row.name}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-slate-900">{row.name}</span>
+                  )}
                   {row.code && (
                     <span className="font-mono text-xs text-slate-500">{row.code}</span>
                   )}
@@ -182,13 +214,15 @@ function ServiceTable({ rows }: { rows: ServiceListItem[] }) {
                   <span className="text-slate-400">—</span>
                 )}
               </TableCell>
-              <TableCell className="text-right">
-                <ServiceRowMenu
-                  id={row.id}
-                  name={row.name}
-                  isActive={row.is_active}
-                />
-              </TableCell>
+              {canManage && (
+                <TableCell className="text-right">
+                  <ServiceRowMenu
+                    id={row.id}
+                    name={row.name}
+                    isActive={row.is_active}
+                  />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

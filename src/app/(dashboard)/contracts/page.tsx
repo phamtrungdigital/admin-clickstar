@@ -31,6 +31,7 @@ import {
   type ContractListItem,
 } from "@/lib/queries/contracts";
 import type { ContractStatus } from "@/lib/database.types";
+import { requireInternalPage } from "@/lib/auth/guards";
 
 export const metadata = { title: "Hợp đồng | Portal.Clickstar.vn" };
 
@@ -45,6 +46,7 @@ export default async function ContractsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireInternalPage();
   const params = await searchParams;
   const status = (params.status as ContractStatus | "all" | undefined) ?? "all";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;

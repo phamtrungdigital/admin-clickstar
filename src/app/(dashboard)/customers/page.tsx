@@ -31,6 +31,7 @@ import {
   type CustomerListItem,
 } from "@/lib/queries/customers";
 import type { CompanyStatus } from "@/lib/database.types";
+import { requireInternalPage } from "@/lib/auth/guards";
 
 export const metadata = { title: "Khách hàng | Portal.Clickstar.vn" };
 
@@ -45,6 +46,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  await requireInternalPage();
   const params = await searchParams;
   const status = (params.status as CompanyStatus | "all" | undefined) ?? "all";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;

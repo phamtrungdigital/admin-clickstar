@@ -6,8 +6,7 @@ import { Bell, HelpCircle, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClickstarLogo } from "@/components/clickstar-logo";
 import { Separator } from "@/components/ui/separator";
-import type { Audience, InternalRole } from "@/lib/database.types";
-import { MobileSidebar } from "./mobile-sidebar";
+import { MobileSidebarTrigger } from "./mobile-sidebar";
 import { UserMenu } from "./user-menu";
 
 const subscribeNoop = () => () => {};
@@ -20,16 +19,12 @@ export function HeaderBar({
   email,
   avatarUrl,
   role,
-  audience,
-  internalRole,
   unreadNotifications = 0,
 }: {
   fullName: string;
   email: string;
   avatarUrl: string | null;
   role: string;
-  audience: Audience;
-  internalRole: InternalRole | null;
   unreadNotifications?: number;
 }) {
   const shortcutLabel = useSyncExternalStore(
@@ -40,7 +35,7 @@ export function HeaderBar({
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-slate-200 bg-white/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
-      <MobileSidebar audience={audience} internalRole={internalRole} />
+      <MobileSidebarTrigger />
 
       {/* Compact logo for mobile (sidebar is hidden, but we still want branding) */}
       <div className="flex items-center lg:hidden">

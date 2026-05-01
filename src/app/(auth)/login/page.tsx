@@ -60,10 +60,24 @@ export default function LoginPage() {
       <BrandPanel />
       <div className="flex flex-col justify-center px-6 py-6 sm:px-10 lg:px-12 lg:py-8">
         <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-          <div className="flex justify-end">
+          {/* Mobile-only logo: brand panel is hidden below lg, so show
+              the wordmark here so users still see the Clickstar identity. */}
+          <div className="flex items-center justify-between gap-3 lg:hidden">
+            <ClickstarLogo variant="dark" size="md" showTagline={false} />
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <Globe className="h-4 w-4 text-slate-500" />
+              Tiếng Việt
+            </button>
+          </div>
+
+          {/* Desktop: language switcher only (logo lives in the brand panel) */}
+          <div className="hidden justify-end lg:flex">
+            <button
+              type="button"
+              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             >
               <Globe className="h-4 w-4 text-slate-500" />
               Tiếng Việt

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -87,7 +87,13 @@ export function MobileSidebarDrawer({
   // backdrop was getting clipped by the dashboard's flex container on some
   // mobile browsers, leaving the page content visible to the right of the
   // drawer.
-  if (typeof document === "undefined") return null;
+  //
+  // Mount-gate the portal: SSR + first client render must agree (both render
+  // null), otherwise React sees a tree mismatch (server has nothing here,
+  // client has the backdrop div) and the dashboard tree throws "couldn't load".
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
 
   return createPortal(
     <>

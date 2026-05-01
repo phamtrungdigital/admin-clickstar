@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { vi } from "date-fns/locale";
 import {
   ArrowRight,
   CalendarRange,
@@ -9,13 +10,20 @@ import {
   Clock,
   Info,
   ListChecks,
-  ShieldCheck,
   User,
   Users,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { getProjectById, type ProjectDetail } from "@/lib/queries/projects";
+import {
+  getLatestPublishedSnapshot,
+  listSnapshotsForProject,
+  readSnapshotPayload,
+} from "@/lib/queries/snapshots";
+import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Chi tiết dự án | Portal.Clickstar.vn" };
@@ -71,9 +79,21 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { profile } = await getCurrentUser();
+  const internal = isInternal(profile);
+  const canApprove =
+    internal &&
+    (profile?.internal_role === "super_admin" ||
+      profile?.internal_role === "admin");
+
   const project = await getProjectById(id).catch(() => null);
   if (!project) notFound();
 
+  if (!internal) {
+    return <CustomerView projectId={project.id} project={project} />;
+  }
+
+  const snapshots = await listSnapshotsForProject(project.id).catch(() => []);
   const stats = computeStats(project);
 
   return (
@@ -88,7 +108,11 @@ export default async function ProjectDetailPage({
         ]}
       />
 
-      <SnapshotBanner />
+      <SnapshotsPanel
+        projectId={project.id}
+        snapshots={snapshots}
+        canApprove={canApprove}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -104,26 +128,266 @@ export default async function ProjectDetailPage({
   );
 }
 
+async function CustomerView({
+  projectId,
+  project,
+}: {
+  projectId: string;
+  project: ProjectDetail;
+}) {
+  const snapshot = await getLatestPublishedSnapshot(projectId).catch(() => null);
+  const payload = snapshot ? readSnapshotPayload(snapshot.payload) : null;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={project.name}
+        description={
+          project.contract?.name ?? `Dự án dịch vụ Clickstar đang triển khai`
+        }
+        breadcrumb={[
+          { label: "Trang chủ", href: "/dashboard" },
+          { label: "Dự án", href: "/projects" },
+          { label: project.name },
+        ]}
+      />
+
+      {snapshot && payload ? (
+        <CustomerSnapshotBanner snapshot={snapshot} />
+      ) : (
+        <CustomerNoSnapshotBanner />
+      )}
+
+      {payload ? (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <CustomerProgressOverview payload={payload} />
+            <CustomerMilestones milestones={payload.milestones} />
+            {payload.tasks.length > 0 && (
+              <CustomerTasksPreview tasks={payload.tasks} />
+            )}
+          </div>
+          <div className="space-y-6">
+            <ProjectInfoCard project={project} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CustomerSnapshotBanner({
+  snapshot,
+}: {
+  snapshot: { approved_at: string | null; created_at: string };
+}) {
+  const stamp = snapshot.approved_at ?? snapshot.created_at;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-3 text-sm">
+      <div className="flex items-center gap-2 text-blue-900">
+        <svg
+          className="h-4 w-4 flex-shrink-0 text-blue-600"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 12 11 14 15 10" />
+          <circle cx="12" cy="12" r="10" />
+        </svg>
+        <span>
+          Dữ liệu hiển thị từ <strong>snapshot đã duyệt</strong>, cập nhật{" "}
+          {formatDistanceToNow(new Date(stamp), {
+            locale: vi,
+            addSuffix: true,
+          })}
+          .
+        </span>
+      </div>
+      <span className="text-xs text-blue-700">
+        {format(new Date(stamp), "dd/MM/yyyy HH:mm")}
+      </span>
+    </div>
+  );
+}
+
+function CustomerNoSnapshotBanner() {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-5 py-4 text-sm text-amber-900">
+      <strong>Đang chờ Clickstar tạo bản tổng hợp đầu tiên.</strong>
+      <br />
+      Khi PM phụ trách công bố bản tổng hợp tiến độ, anh/chị sẽ thấy chi tiết
+      milestones và task ở đây.
+    </div>
+  );
+}
+
+function CustomerProgressOverview({
+  payload,
+}: {
+  payload: NonNullable<ReturnType<typeof readSnapshotPayload>>;
+}) {
+  const total = payload.milestones.length;
+  const done = payload.milestones.filter((m) => m.status === "completed").length;
+  const doing = payload.milestones.filter((m) => m.status === "active").length;
+  const pending = total - done - doing;
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6">
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+        Tiến độ tổng thể
+      </h3>
+      <div className="flex flex-col gap-6 md:flex-row md:items-center">
+        <div className="relative flex h-32 w-32 flex-shrink-0 items-center justify-center">
+          <svg viewBox="0 0 36 36" className="h-32 w-32 -rotate-90">
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              stroke="#e2e8f0"
+              strokeWidth="3"
+            />
+            <circle
+              cx="18"
+              cy="18"
+              r="15.915"
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth="3"
+              strokeDasharray={`${payload.project.progress_percent} 100`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-2xl font-bold text-slate-900">
+              {payload.project.progress_percent}%
+            </span>
+            <span className="text-[11px] text-slate-500">Hoàn thành</span>
+          </div>
+        </div>
+        <dl className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+          <Stat label="Đã hoàn thành" value={done} dot="bg-emerald-500" />
+          <Stat label="Đang thực hiện" value={doing} dot="bg-blue-500" />
+          <Stat label="Sắp tới" value={pending} dot="bg-slate-300" />
+        </dl>
+      </div>
+    </section>
+  );
+}
+
+function CustomerMilestones({
+  milestones,
+}: {
+  milestones: NonNullable<ReturnType<typeof readSnapshotPayload>>["milestones"];
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-900">
+          Các giai đoạn (Milestones)
+        </h3>
+        <span className="text-xs text-slate-500">
+          {milestones.length} giai đoạn
+        </span>
+      </div>
+      <ol className="relative space-y-5 border-l border-slate-200 pl-6">
+        {milestones.map((m) => {
+          const tone = MILESTONE_TONE[m.status] ?? MILESTONE_TONE.not_started;
+          return (
+            <li key={m.id} className="relative">
+              <span
+                className={cn(
+                  "absolute -left-[31px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white",
+                  tone.dot,
+                )}
+              />
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {m.code && (
+                      <span className="mr-1.5 font-mono text-xs text-slate-500">
+                        {m.code}
+                      </span>
+                    )}
+                    {m.title}
+                  </p>
+                  {m.starts_at && m.ends_at && (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {format(new Date(m.starts_at), "dd/MM")} —{" "}
+                      {format(new Date(m.ends_at), "dd/MM/yyyy")}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+                    tone.pill,
+                  )}
+                >
+                  {tone.label}
+                </span>
+              </div>
+              {m.status === "active" && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${m.progress_percent}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-slate-600">
+                    {m.progress_percent}%
+                  </span>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function CustomerTasksPreview({
+  tasks,
+}: {
+  tasks: NonNullable<ReturnType<typeof readSnapshotPayload>>["tasks"];
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6">
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+        Hạng mục công khai ({tasks.length})
+      </h3>
+      <ul className="space-y-2">
+        {tasks.map((t) => (
+          <li
+            key={t.id}
+            className="flex items-center justify-between gap-3 rounded-md border border-slate-100 px-3 py-2"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-slate-800">{t.title}</p>
+              {t.due_at && (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Hạn {format(new Date(t.due_at), "dd/MM/yyyy")}
+                </p>
+              )}
+            </div>
+            <TaskStatusBadge status={t.status} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function computeStats(project: ProjectDetail) {
   const total = project.milestones.length;
   const done = project.milestones.filter((m) => m.status === "completed").length;
   const doing = project.milestones.filter((m) => m.status === "active").length;
   const pending = total - done - doing;
   return { total, done, doing, pending };
-}
-
-function SnapshotBanner() {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-3 text-sm">
-      <div className="flex items-center gap-2 text-blue-900">
-        <ShieldCheck className="h-4 w-4 flex-shrink-0 text-blue-600" />
-        <span>
-          <strong>Phase 2</strong> sẽ thêm cơ chế snapshot — khách chỉ thấy
-          dữ liệu đã được duyệt. Hiện tại dữ liệu hiện trực tiếp từ DB.
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function ProgressOverview({

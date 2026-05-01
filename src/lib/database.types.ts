@@ -62,6 +62,20 @@ export type TaskStatus =
 
 export type TaskExtraSource = "internal" | "customer" | "risk";
 
+export type SnapshotType =
+  | "weekly"
+  | "milestone"
+  | "deliverable"
+  | "extra_task";
+
+export type SnapshotStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "auto_published"
+  | "rejected"
+  | "rolled_back";
+
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type TicketStatus =
@@ -312,6 +326,22 @@ export interface TaskChecklistItemRow extends Timestamps {
   done: boolean;
   done_by: string | null;
   done_at: string | null;
+}
+
+export interface SnapshotRow extends Timestamps {
+  id: string;
+  project_id: string;
+  contract_id: string;
+  type: SnapshotType;
+  status: SnapshotStatus;
+  payload: Json;
+  notes: string | null;
+  auto_publish_at: string | null;
+  rollback_until: string | null;
+  created_by: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_reason: string | null;
 }
 
 export interface TaskCommentRow extends Timestamps, SoftDeletable {
@@ -615,6 +645,12 @@ export interface Database {
         Row: TaskChecklistItemRow;
         Insert: Insertable<TaskChecklistItemRow>;
         Update: Updatable<TaskChecklistItemRow>;
+        Relationships: [];
+      };
+      snapshots: {
+        Row: SnapshotRow;
+        Insert: Insertable<SnapshotRow>;
+        Update: Updatable<SnapshotRow>;
         Relationships: [];
       };
       task_comments: {

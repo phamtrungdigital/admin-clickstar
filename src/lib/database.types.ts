@@ -51,11 +51,16 @@ export type ServiceStatus =
 
 export type TaskStatus =
   | "todo"
+  | "assigned"
   | "in_progress"
   | "awaiting_customer"
+  | "blocked"
   | "awaiting_review"
+  | "returned"
   | "done"
   | "cancelled";
+
+export type TaskExtraSource = "internal" | "customer" | "risk";
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
@@ -208,6 +213,10 @@ export interface ProjectRow extends Timestamps, SoftDeletable {
   ends_at: string | null;
   status: ServiceStatus;
   primary_owner_id: string | null;
+  template_id: string | null;
+  template_version: number | null;
+  pm_id: string | null;
+  progress_percent: number;
   metadata: Json;
   created_by: string | null;
 }
@@ -217,16 +226,92 @@ export interface TaskRow extends Timestamps, SoftDeletable {
   company_id: string;
   project_id: string | null;
   contract_service_id: string | null;
+  milestone_id: string | null;
+  template_task_id: string | null;
   title: string;
   description: string | null;
   assignee_id: string | null;
   reporter_id: string | null;
+  reviewer_id: string | null;
   due_at: string | null;
   status: TaskStatus;
   priority: TaskPriority;
   is_visible_to_customer: boolean;
+  is_extra: boolean;
+  extra_source: TaskExtraSource | null;
   metadata: Json;
   created_by: string | null;
+}
+
+export interface ServiceTemplateRow extends Timestamps, SoftDeletable {
+  id: string;
+  name: string;
+  industry: string | null;
+  description: string | null;
+  duration_days: number | null;
+  version: number;
+  is_active: boolean;
+  metadata: Json;
+  created_by: string | null;
+}
+
+export interface TemplateMilestoneRow extends Timestamps {
+  id: string;
+  template_id: string;
+  code: string | null;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  offset_start_days: number;
+  offset_end_days: number;
+  deliverable_required: boolean;
+}
+
+export interface TemplateTaskRow extends Timestamps {
+  id: string;
+  template_id: string;
+  template_milestone_id: string | null;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  default_role: string | null;
+  offset_days: number;
+  duration_days: number;
+  priority: TaskPriority;
+  is_visible_to_customer: boolean;
+}
+
+export interface TemplateChecklistItemRow {
+  id: string;
+  template_task_id: string;
+  content: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MilestoneRow extends Timestamps {
+  id: string;
+  project_id: string;
+  template_milestone_id: string | null;
+  code: string | null;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  status: ServiceStatus;
+  progress_percent: number;
+  deliverable_required: boolean;
+}
+
+export interface TaskChecklistItemRow extends Timestamps {
+  id: string;
+  task_id: string;
+  content: string;
+  sort_order: number;
+  done: boolean;
+  done_by: string | null;
+  done_at: string | null;
 }
 
 export interface TaskCommentRow extends Timestamps, SoftDeletable {
@@ -490,10 +575,46 @@ export interface Database {
         Update: Updatable<ProjectRow>;
         Relationships: [];
       };
+      service_templates: {
+        Row: ServiceTemplateRow;
+        Insert: Insertable<ServiceTemplateRow>;
+        Update: Updatable<ServiceTemplateRow>;
+        Relationships: [];
+      };
+      template_milestones: {
+        Row: TemplateMilestoneRow;
+        Insert: Insertable<TemplateMilestoneRow>;
+        Update: Updatable<TemplateMilestoneRow>;
+        Relationships: [];
+      };
+      template_tasks: {
+        Row: TemplateTaskRow;
+        Insert: Insertable<TemplateTaskRow>;
+        Update: Updatable<TemplateTaskRow>;
+        Relationships: [];
+      };
+      template_checklist_items: {
+        Row: TemplateChecklistItemRow;
+        Insert: TemplateChecklistItemRow;
+        Update: Partial<TemplateChecklistItemRow>;
+        Relationships: [];
+      };
+      milestones: {
+        Row: MilestoneRow;
+        Insert: Insertable<MilestoneRow>;
+        Update: Updatable<MilestoneRow>;
+        Relationships: [];
+      };
       tasks: {
         Row: TaskRow;
         Insert: Insertable<TaskRow>;
         Update: Updatable<TaskRow>;
+        Relationships: [];
+      };
+      task_checklist_items: {
+        Row: TaskChecklistItemRow;
+        Insert: Insertable<TaskChecklistItemRow>;
+        Update: Updatable<TaskChecklistItemRow>;
         Relationships: [];
       };
       task_comments: {

@@ -1758,3 +1758,621 @@ comment on column public.contracts.attachment_url is 'Either a storage object pa
 comment on column public.contracts.attachment_filename is 'Display name for the attachment, falls back to the last path segment when null';
 
 
+-- ============================================================
+-- 0015_company_services.sql
+-- ============================================================
+
+-- 0015_company_services.sql
+-- Junction: which services a customer (company) uses.
+-- Distinct from contract_services (which scopes services to a contract):
+-- this represents the customer's profile of services regardless of contract.
+
+create table if not exists public.company_services (
+  company_id   uuid not null references public.companies(id) on delete cascade,
+  service_id   uuid not null references public.services(id) on delete restrict,
+  created_at   timestamptz not null default now(),
+  primary key (company_id, service_id)
+);
+
+create index if not exists company_services_service_idx
+  on public.company_services (service_id);
+
+-- RLS: mirror contract_services pattern — internal staff can manage all,
+-- customer users can only see their own company's links.
+alter table public.company_services enable row level security;
+
+drop policy if exists company_services_select on public.company_services;
+create policy company_services_select on public.company_services
+  for select to authenticated
+  using (public.can_access_company(company_id));
+
+drop policy if exists company_services_modify_internal on public.company_services;
+create policy company_services_modify_internal on public.company_services
+  for all to authenticated
+  using (public.is_internal() and public.can_access_company(company_id))
+  with check (public.is_internal() and public.can_access_company(company_id));
+
+
+-- ============================================================
+-- 0016_tickets_attachments.sql
+-- ============================================================
+
+-- 0016_tickets_attachments.sql
+-- Add an attachments array to tickets so customers/staff can attach
+-- screenshots and files when reporting / handling an issue.
+--
+-- Each element shape: {
+--   path:         string  -- key inside the `documents` storage bucket
+--   filename:     string
+--   content_type: string
+--   size:         number  -- bytes
+--   uploaded_at:  string  -- ISO timestamp
+-- }
+
+alter table public.tickets
+  add column if not exists attachments jsonb not null default '[]'::jsonb;
+
+
+-- ============================================================
+-- 0017_tickets_storage_policies.sql
+-- ============================================================
+
+-- 0017_tickets_storage_policies.sql
+-- Allow ticket attachments inside the `documents` bucket without requiring a
+-- row in public.documents (which is reserved for first-class document records
+-- like contracts/briefs/reports).
+--
+-- Path convention: companies/<company_id>/tickets/<uuid>.<ext>
+-- Access is gated by can_access_company() — internal staff with company
+-- access AND the customer of the company can upload + read.
+
+drop policy if exists tickets_storage_select on storage.objects;
+create policy tickets_storage_select on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'documents'
+    and (storage.foldername(name))[1] = 'companies'
+    and (storage.foldername(name))[3] = 'tickets'
+    and public.can_access_company(((storage.foldername(name))[2])::uuid)
+  );
+
+drop policy if exists tickets_storage_insert on storage.objects;
+create policy tickets_storage_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'documents'
+    and (storage.foldername(name))[1] = 'companies'
+    and (storage.foldername(name))[3] = 'tickets'
+    and public.can_access_company(((storage.foldername(name))[2])::uuid)
+  );
+
+drop policy if exists tickets_storage_delete on storage.objects;
+create policy tickets_storage_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'documents'
+    and (storage.foldername(name))[1] = 'companies'
+    and (storage.foldername(name))[3] = 'tickets'
+    and public.is_internal()
+    and public.can_access_company(((storage.foldername(name))[2])::uuid)
+  );
+
+
+-- ============================================================
+-- 0018_role_permissions.sql
+-- ============================================================
+
+-- 0018_role_permissions.sql
+-- Editable per-role action permissions. RLS already gates DATA access by
+-- company / project; this table layers on a UI/business gate for ACTIONS
+-- (e.g. "can a manager create a contract?").
+--
+-- Source of truth at runtime is this table — the UI matrix at
+-- /admin/roles reads + writes it. PRD §3 supplies the seed defaults.
+--
+-- We store one row per (role, scope) so the matrix is just rows in/out.
+-- "scope" is a logical surface (users, customers, contracts, ...) and
+-- "level" is one of: none, view, scoped, manage, full.
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_type where typname = 'permission_level' and typnamespace = 'public'::regnamespace
+  ) then
+    create type public.permission_level as enum (
+      'none',
+      'view',
+      'scoped',
+      'manage',
+      'full'
+    );
+  end if;
+end $$;
+
+create table if not exists public.role_permissions (
+  role         public.internal_role not null,
+  scope        text not null,
+  level        public.permission_level not null default 'none',
+  updated_at   timestamptz not null default now(),
+  updated_by   uuid references public.profiles(id) on delete set null,
+  primary key (role, scope)
+);
+
+drop trigger if exists set_role_permissions_updated_at on public.role_permissions;
+create trigger set_role_permissions_updated_at
+  before update on public.role_permissions
+  for each row execute function public.set_updated_at();
+
+-- RLS: anyone authenticated reads (UI needs to know what current user can do);
+-- only super_admin writes. Admin users CAN see but cannot edit — keeps the
+-- "you can't elevate yourself" guarantee.
+alter table public.role_permissions enable row level security;
+
+drop policy if exists role_permissions_select on public.role_permissions;
+create policy role_permissions_select on public.role_permissions
+  for select to authenticated
+  using (true);
+
+drop policy if exists role_permissions_modify_super_admin on public.role_permissions;
+create policy role_permissions_modify_super_admin on public.role_permissions
+  for all to authenticated
+  using (public.current_internal_role() = 'super_admin')
+  with check (public.current_internal_role() = 'super_admin');
+
+-- Seed defaults — mirrors the matrix shipped in commit 3c06804 / PRD §3.
+insert into public.role_permissions (role, scope, level) values
+  -- super_admin
+  ('super_admin', 'users',     'full'),
+  ('super_admin', 'customers', 'full'),
+  ('super_admin', 'contracts', 'full'),
+  ('super_admin', 'services',  'full'),
+  ('super_admin', 'tasks',     'full'),
+  ('super_admin', 'tickets',   'full'),
+  ('super_admin', 'documents', 'full'),
+  ('super_admin', 'reports',   'full'),
+  ('super_admin', 'settings',  'full'),
+  -- admin
+  ('admin', 'users',     'manage'),
+  ('admin', 'customers', 'manage'),
+  ('admin', 'contracts', 'manage'),
+  ('admin', 'services',  'manage'),
+  ('admin', 'tasks',     'manage'),
+  ('admin', 'tickets',   'manage'),
+  ('admin', 'documents', 'manage'),
+  ('admin', 'reports',   'view'),
+  ('admin', 'settings',  'manage'),
+  -- manager
+  ('manager', 'users',     'view'),
+  ('manager', 'customers', 'scoped'),
+  ('manager', 'contracts', 'scoped'),
+  ('manager', 'services',  'view'),
+  ('manager', 'tasks',     'scoped'),
+  ('manager', 'tickets',   'scoped'),
+  ('manager', 'documents', 'scoped'),
+  ('manager', 'reports',   'view'),
+  ('manager', 'settings',  'none'),
+  -- staff (Nhân viên triển khai)
+  ('staff', 'users',     'none'),
+  ('staff', 'customers', 'scoped'),
+  ('staff', 'contracts', 'scoped'),
+  ('staff', 'services',  'view'),
+  ('staff', 'tasks',     'scoped'),
+  ('staff', 'tickets',   'scoped'),
+  ('staff', 'documents', 'scoped'),
+  ('staff', 'reports',   'none'),
+  ('staff', 'settings',  'none'),
+  -- support (CSKH)
+  ('support', 'users',     'none'),
+  ('support', 'customers', 'scoped'),
+  ('support', 'contracts', 'view'),
+  ('support', 'services',  'view'),
+  ('support', 'tasks',     'view'),
+  ('support', 'tickets',   'scoped'),
+  ('support', 'documents', 'scoped'),
+  ('support', 'reports',   'none'),
+  ('support', 'settings',  'none'),
+  -- accountant (Kế toán)
+  ('accountant', 'users',     'none'),
+  ('accountant', 'customers', 'view'),
+  ('accountant', 'contracts', 'manage'),
+  ('accountant', 'services',  'view'),
+  ('accountant', 'tasks',     'none'),
+  ('accountant', 'tickets',   'none'),
+  ('accountant', 'documents', 'scoped'),
+  ('accountant', 'reports',   'view'),
+  ('accountant', 'settings',  'none')
+on conflict (role, scope) do nothing;
+
+
+-- ============================================================
+-- 0019_system_settings.sql
+-- ============================================================
+
+-- 0019_system_settings.sql
+-- Key-value store for system-wide configuration. Flexible enough to add
+-- new settings without a schema change — just insert a new key.
+--
+-- Read: anyone authenticated (settings affect UI defaults).
+-- Write: super_admin only.
+
+create table if not exists public.system_settings (
+  key          text primary key,
+  value        jsonb not null,
+  updated_at   timestamptz not null default now(),
+  updated_by   uuid references public.profiles(id) on delete set null
+);
+
+drop trigger if exists set_system_settings_updated_at on public.system_settings;
+create trigger set_system_settings_updated_at
+  before update on public.system_settings
+  for each row execute function public.set_updated_at();
+
+alter table public.system_settings enable row level security;
+
+drop policy if exists system_settings_select on public.system_settings;
+create policy system_settings_select on public.system_settings
+  for select to authenticated
+  using (true);
+
+drop policy if exists system_settings_modify_super_admin on public.system_settings;
+create policy system_settings_modify_super_admin on public.system_settings
+  for all to authenticated
+  using (public.current_internal_role() = 'super_admin')
+  with check (public.current_internal_role() = 'super_admin');
+
+-- Seed defaults — JSON-encoded values so we can store strings, numbers, booleans.
+insert into public.system_settings (key, value) values
+  ('org.name',              '"Clickstar"'::jsonb),
+  ('org.tagline',           '"Giải pháp Digital & Automation toàn diện"'::jsonb),
+  ('org.address',           '""'::jsonb),
+  ('org.tax_code',          '""'::jsonb),
+  ('org.support_email',     '"support@clickstar.vn"'::jsonb),
+  ('business.default_vat',  '8'::jsonb),
+  ('business.default_currency', '"VND"'::jsonb),
+  ('notifications.email_enabled', 'true'::jsonb),
+  ('notifications.zns_enabled',   'false'::jsonb)
+on conflict (key) do nothing;
+
+
+-- ============================================================
+-- 0020_p1_templates_milestones.sql
+-- ============================================================
+
+-- 0020_p1_templates_milestones.sql
+-- Phase 1.1: Service Templates + Milestones + Task lifecycle expansion.
+-- Builds on top of the existing `projects` + `tasks` tables — these become
+-- the "service instance" + task instance layer in PRD section 5/6 terminology.
+
+-- 1) Expand task_status to cover the 7-state PRD lifecycle ----------------
+-- Existing: todo, in_progress, awaiting_customer, awaiting_review, done, cancelled
+-- Add: assigned, blocked, returned. Existing values keep working.
+-- (PostgreSQL ALTER TYPE ... ADD VALUE is forwards-compatible.)
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum
+    where enumlabel = 'assigned'
+      and enumtypid = (select oid from pg_type where typname = 'task_status')
+  ) then
+    alter type public.task_status add value 'assigned' before 'in_progress';
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum
+    where enumlabel = 'blocked'
+      and enumtypid = (select oid from pg_type where typname = 'task_status')
+  ) then
+    alter type public.task_status add value 'blocked' before 'awaiting_review';
+  end if;
+end$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum
+    where enumlabel = 'returned'
+      and enumtypid = (select oid from pg_type where typname = 'task_status')
+  ) then
+    alter type public.task_status add value 'returned' before 'done';
+  end if;
+end$$;
+
+-- 2) service_templates: a reusable task-list blueprint per service kind ---
+create table if not exists public.service_templates (
+  id              uuid primary key default gen_random_uuid(),
+  name            text not null,
+  industry        text,                 -- e.g. 'SEO', 'Ads', 'Content', 'Web'
+  description     text,
+  duration_days   integer,              -- standard length, e.g. 180 for SEO 6m
+  version         integer not null default 1,
+  is_active       boolean not null default true,
+  metadata        jsonb not null default '{}'::jsonb,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  deleted_at      timestamptz,
+  created_by      uuid references public.profiles(id) on delete set null
+);
+
+create index if not exists service_templates_active_idx
+  on public.service_templates (is_active)
+  where deleted_at is null;
+
+drop trigger if exists set_service_templates_updated_at on public.service_templates;
+create trigger set_service_templates_updated_at
+  before update on public.service_templates
+  for each row execute function public.set_updated_at();
+
+-- 3) template_milestones: shape of milestones inside a template ----------
+create table if not exists public.template_milestones (
+  id                  uuid primary key default gen_random_uuid(),
+  template_id         uuid not null references public.service_templates(id) on delete cascade,
+  code                text,             -- e.g. 'M1', 'M2'
+  title               text not null,
+  description         text,
+  sort_order          integer not null default 0,
+  offset_start_days   integer not null default 0,
+  offset_end_days     integer not null default 0,
+  deliverable_required boolean not null default false,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
+create index if not exists template_milestones_template_idx
+  on public.template_milestones (template_id);
+
+drop trigger if exists set_template_milestones_updated_at on public.template_milestones;
+create trigger set_template_milestones_updated_at
+  before update on public.template_milestones
+  for each row execute function public.set_updated_at();
+
+-- 4) template_tasks: shape of tasks inside a template --------------------
+create table if not exists public.template_tasks (
+  id                      uuid primary key default gen_random_uuid(),
+  template_id             uuid not null references public.service_templates(id) on delete cascade,
+  template_milestone_id   uuid references public.template_milestones(id) on delete set null,
+  title                   text not null,
+  description             text,
+  sort_order              integer not null default 0,
+  default_role            text,                  -- 'seo','content','design','dev'
+  offset_days             integer not null default 0,
+  duration_days           integer not null default 1,
+  priority                public.task_priority not null default 'medium',
+  is_visible_to_customer  boolean not null default false,
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now()
+);
+
+create index if not exists template_tasks_template_idx
+  on public.template_tasks (template_id);
+create index if not exists template_tasks_milestone_idx
+  on public.template_tasks (template_milestone_id);
+
+drop trigger if exists set_template_tasks_updated_at on public.template_tasks;
+create trigger set_template_tasks_updated_at
+  before update on public.template_tasks
+  for each row execute function public.set_updated_at();
+
+-- 5) template_checklist_items: default checklist for a template task ----
+create table if not exists public.template_checklist_items (
+  id                  uuid primary key default gen_random_uuid(),
+  template_task_id    uuid not null references public.template_tasks(id) on delete cascade,
+  content             text not null,
+  sort_order          integer not null default 0,
+  created_at          timestamptz not null default now()
+);
+
+create index if not exists template_checklist_items_task_idx
+  on public.template_checklist_items (template_task_id);
+
+-- 6) projects: extend with template fork tracking + PM + progress -------
+alter table public.projects
+  add column if not exists template_id uuid references public.service_templates(id) on delete set null;
+alter table public.projects
+  add column if not exists template_version integer;
+alter table public.projects
+  add column if not exists pm_id uuid references public.profiles(id) on delete set null;
+alter table public.projects
+  add column if not exists progress_percent integer not null default 0;
+
+create index if not exists projects_template_idx
+  on public.projects (template_id) where deleted_at is null;
+create index if not exists projects_pm_idx
+  on public.projects (pm_id) where deleted_at is null;
+
+-- 7) milestones: instance per project, optionally cloned from template --
+create table if not exists public.milestones (
+  id                      uuid primary key default gen_random_uuid(),
+  project_id              uuid not null references public.projects(id) on delete cascade,
+  template_milestone_id   uuid references public.template_milestones(id) on delete set null,
+  code                    text,
+  title                   text not null,
+  description             text,
+  sort_order              integer not null default 0,
+  starts_at               date,
+  ends_at                 date,
+  status                  public.service_status not null default 'not_started',
+  progress_percent        integer not null default 0,
+  deliverable_required    boolean not null default false,
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now()
+);
+
+create index if not exists milestones_project_idx
+  on public.milestones (project_id);
+
+drop trigger if exists set_milestones_updated_at on public.milestones;
+create trigger set_milestones_updated_at
+  before update on public.milestones
+  for each row execute function public.set_updated_at();
+
+-- 8) tasks: extend with milestone, lifecycle metadata, reviewer, source -
+alter table public.tasks
+  add column if not exists milestone_id uuid references public.milestones(id) on delete set null;
+alter table public.tasks
+  add column if not exists template_task_id uuid references public.template_tasks(id) on delete set null;
+alter table public.tasks
+  add column if not exists reviewer_id uuid references public.profiles(id) on delete set null;
+alter table public.tasks
+  add column if not exists is_extra boolean not null default false;
+alter table public.tasks
+  add column if not exists extra_source text; -- 'internal' | 'customer' | 'risk'
+
+create index if not exists tasks_milestone_idx
+  on public.tasks (milestone_id) where deleted_at is null;
+create index if not exists tasks_reviewer_idx
+  on public.tasks (reviewer_id) where deleted_at is null;
+create index if not exists tasks_extra_idx
+  on public.tasks (is_extra) where deleted_at is null and is_extra = true;
+
+-- 9) task_checklist_items: per-task checklist (separate from comments) -
+create table if not exists public.task_checklist_items (
+  id              uuid primary key default gen_random_uuid(),
+  task_id         uuid not null references public.tasks(id) on delete cascade,
+  content         text not null,
+  sort_order      integer not null default 0,
+  done            boolean not null default false,
+  done_by         uuid references public.profiles(id) on delete set null,
+  done_at         timestamptz,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create index if not exists task_checklist_items_task_idx
+  on public.task_checklist_items (task_id);
+
+drop trigger if exists set_task_checklist_items_updated_at on public.task_checklist_items;
+create trigger set_task_checklist_items_updated_at
+  before update on public.task_checklist_items
+  for each row execute function public.set_updated_at();
+
+-- 10) RLS policies for new tables ---------------------------------------
+
+-- service_templates: internal admins write, all internal staff read.
+-- Templates are not customer-visible (per PRD §10).
+alter table public.service_templates enable row level security;
+
+drop policy if exists service_templates_select on public.service_templates;
+create policy service_templates_select on public.service_templates
+  for select to authenticated
+  using (public.is_internal());
+
+drop policy if exists service_templates_modify_admin on public.service_templates;
+create policy service_templates_modify_admin on public.service_templates
+  for all to authenticated
+  using (public.is_internal_admin())
+  with check (public.is_internal_admin());
+
+-- template_milestones: same model as service_templates
+alter table public.template_milestones enable row level security;
+
+drop policy if exists template_milestones_select on public.template_milestones;
+create policy template_milestones_select on public.template_milestones
+  for select to authenticated
+  using (public.is_internal());
+
+drop policy if exists template_milestones_modify_admin on public.template_milestones;
+create policy template_milestones_modify_admin on public.template_milestones
+  for all to authenticated
+  using (public.is_internal_admin())
+  with check (public.is_internal_admin());
+
+-- template_tasks
+alter table public.template_tasks enable row level security;
+
+drop policy if exists template_tasks_select on public.template_tasks;
+create policy template_tasks_select on public.template_tasks
+  for select to authenticated
+  using (public.is_internal());
+
+drop policy if exists template_tasks_modify_admin on public.template_tasks;
+create policy template_tasks_modify_admin on public.template_tasks
+  for all to authenticated
+  using (public.is_internal_admin())
+  with check (public.is_internal_admin());
+
+-- template_checklist_items
+alter table public.template_checklist_items enable row level security;
+
+drop policy if exists template_checklist_items_select on public.template_checklist_items;
+create policy template_checklist_items_select on public.template_checklist_items
+  for select to authenticated
+  using (public.is_internal());
+
+drop policy if exists template_checklist_items_modify_admin on public.template_checklist_items;
+create policy template_checklist_items_modify_admin on public.template_checklist_items
+  for all to authenticated
+  using (public.is_internal_admin())
+  with check (public.is_internal_admin());
+
+-- milestones: scope by parent project's company
+alter table public.milestones enable row level security;
+
+drop policy if exists milestones_select on public.milestones;
+create policy milestones_select on public.milestones
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.projects p
+      where p.id = milestones.project_id
+        and public.can_access_company(p.company_id)
+    )
+  );
+
+drop policy if exists milestones_modify_internal on public.milestones;
+create policy milestones_modify_internal on public.milestones
+  for all to authenticated
+  using (
+    public.is_internal()
+    and exists (
+      select 1 from public.projects p
+      where p.id = milestones.project_id
+        and public.can_access_company(p.company_id)
+    )
+  )
+  with check (
+    public.is_internal()
+    and exists (
+      select 1 from public.projects p
+      where p.id = milestones.project_id
+        and public.can_access_company(p.company_id)
+    )
+  );
+
+-- task_checklist_items: scope by parent task's company
+alter table public.task_checklist_items enable row level security;
+
+drop policy if exists task_checklist_items_select on public.task_checklist_items;
+create policy task_checklist_items_select on public.task_checklist_items
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.tasks t
+      where t.id = task_checklist_items.task_id
+        and public.can_access_company(t.company_id)
+    )
+  );
+
+drop policy if exists task_checklist_items_modify_internal on public.task_checklist_items;
+create policy task_checklist_items_modify_internal on public.task_checklist_items
+  for all to authenticated
+  using (
+    public.is_internal()
+    and exists (
+      select 1 from public.tasks t
+      where t.id = task_checklist_items.task_id
+        and public.can_access_company(t.company_id)
+    )
+  )
+  with check (
+    public.is_internal()
+    and exists (
+      select 1 from public.tasks t
+      where t.id = task_checklist_items.task_id
+        and public.can_access_company(t.company_id)
+    )
+  );
+
+

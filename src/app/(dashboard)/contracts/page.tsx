@@ -31,7 +31,9 @@ import {
   type ContractListItem,
 } from "@/lib/queries/contracts";
 import type { ContractStatus } from "@/lib/database.types";
-import { requireInternalPage } from "@/lib/auth/guards";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
+import { ComingSoon } from "@/components/dashboard/coming-soon";
 
 export const metadata = { title: "Hợp đồng | Portal.Clickstar.vn" };
 
@@ -46,7 +48,17 @@ export default async function ContractsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireInternalPage();
+  const { profile } = await getCurrentUser();
+  if (!isInternal(profile)) {
+    return (
+      <ComingSoon
+        title="Hợp đồng"
+        description="Hợp đồng dịch vụ của doanh nghiệp bạn — sẽ hiển thị khi tài khoản được Clickstar gắn vào doanh nghiệp."
+        breadcrumb={[{ label: "Trang chủ", href: "/dashboard" }, { label: "Hợp đồng" }]}
+        phase="2"
+      />
+    );
+  }
   const params = await searchParams;
   const status = (params.status as ContractStatus | "all" | undefined) ?? "all";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;

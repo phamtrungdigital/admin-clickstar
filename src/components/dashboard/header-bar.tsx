@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import Link from "next/link";
 import { Bell, HelpCircle, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -8,6 +9,7 @@ import { ClickstarLogo } from "@/components/clickstar-logo";
 import { Separator } from "@/components/ui/separator";
 import { MobileSidebarTrigger } from "./mobile-sidebar";
 import { UserMenu } from "./user-menu";
+import type { Audience } from "@/lib/database.types";
 
 const subscribeNoop = () => () => {};
 const getShortcutLabelClient = () =>
@@ -19,14 +21,20 @@ export function HeaderBar({
   email,
   avatarUrl,
   role,
+  audience,
   unreadNotifications = 0,
 }: {
   fullName: string;
   email: string;
   avatarUrl: string | null;
   role: string;
+  audience: Audience;
   unreadNotifications?: number;
 }) {
+  const isCustomer = audience === "customer";
+  const searchPlaceholder = isCustomer
+    ? "Tìm kiếm ticket, dịch vụ, nội dung..."
+    : "Tìm kiếm khách hàng, hợp đồng, ticket...";
   const shortcutLabel = useSyncExternalStore(
     subscribeNoop,
     getShortcutLabelClient,
@@ -47,7 +55,7 @@ export function HeaderBar({
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
-          placeholder="Tìm kiếm khách hàng, hợp đồng, ticket..."
+          placeholder={searchPlaceholder}
           className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-9 pr-16 text-sm placeholder:text-slate-400 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
         />
         <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
@@ -65,8 +73,8 @@ export function HeaderBar({
           <Search className="h-5 w-5" />
         </button>
 
-        <button
-          type="button"
+        <Link
+          href="/notifications"
           aria-label="Thông báo"
           className={cn(
             "relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500",
@@ -79,7 +87,7 @@ export function HeaderBar({
               {unreadNotifications > 99 ? "99+" : unreadNotifications}
             </span>
           )}
-        </button>
+        </Link>
         <button
           type="button"
           aria-label="Trợ giúp"

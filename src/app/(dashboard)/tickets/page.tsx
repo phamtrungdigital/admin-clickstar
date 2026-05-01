@@ -59,7 +59,7 @@ export default async function TicketsPage({
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
   const search = params.q ?? "";
 
-  const { profile } = await getCurrentUser();
+  const { id: userId, profile } = await getCurrentUser();
   const canManage = isInternal(profile);
 
   let stats = { total: 0, open: 0, in_progress: 0, resolved: 0 };
@@ -74,7 +74,15 @@ export default async function TicketsPage({
   try {
     [stats, listResult] = await Promise.all([
       getTicketStats(),
-      listTickets({ search, status, priority, page }),
+      listTickets({
+        search,
+        status,
+        priority,
+        page,
+        // Customer view: only their own tickets (Layer 1.5 scope until
+        // company-membership RLS lands in Phase 2).
+        reporter_id: canManage ? undefined : userId,
+      }),
     ]);
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Không tải được dữ liệu";
@@ -83,11 +91,15 @@ export default async function TicketsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Ticket"
-        description="Yêu cầu hỗ trợ và quy trình xử lý CSKH cho khách hàng đã ký hợp đồng."
+        title={canManage ? "Ticket" : "Ticket của tôi"}
+        description={
+          canManage
+            ? "Yêu cầu hỗ trợ và quy trình xử lý CSKH cho khách hàng đã ký hợp đồng."
+            : "Tất cả yêu cầu hỗ trợ bạn đã gửi tới Clickstar."
+        }
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
-          { label: "Ticket" },
+          { label: canManage ? "Ticket" : "Ticket của tôi" },
         ]}
         actions={
           <Link
@@ -97,7 +109,8 @@ export default async function TicketsPage({
               "bg-blue-600 px-4 text-white hover:bg-blue-700",
             )}
           >
-            <Plus className="mr-2 h-4 w-4" /> Thêm ticket
+            <Plus className="mr-2 h-4 w-4" />
+            {canManage ? "Thêm ticket" : "Tạo ticket mới"}
           </Link>
         }
       />

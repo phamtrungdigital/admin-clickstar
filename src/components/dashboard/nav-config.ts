@@ -13,6 +13,7 @@ import {
   Workflow,
   ShieldUser,
   Settings,
+  Bell,
 } from "lucide-react";
 import type { InternalRole } from "@/lib/database.types";
 
@@ -67,16 +68,18 @@ export const internalNav: NavItem[] = [
 ];
 
 /**
- * Customer portal nav (Phase 2 — placeholder for now). Customers see far fewer
- * items and only data scoped to their company.
+ * Customer portal nav. Ticket-centric — the customer's primary loop is
+ * "file ticket → wait for reply → acknowledge". /tickets/new is exposed as a
+ * pinned CTA in the sidebar, not as a nav row.
  */
 export const customerNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Dịch vụ đang dùng", href: "/services", icon: Package },
-  { label: "Công việc", href: "/tasks", icon: ListChecks },
-  { label: "Ticket", href: "/tickets", icon: Ticket },
+  { label: "Ticket của tôi", href: "/tickets", icon: Ticket },
+  { label: "Dịch vụ", href: "/services", icon: Package },
+  { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
   { label: "Tài liệu", href: "/documents", icon: FolderOpen },
-  { label: "Báo cáo", href: "/reports", icon: BarChart3 },
+  { label: "Thông báo", href: "/notifications", icon: Bell },
+  { label: "Cài đặt", href: "/settings", icon: Settings },
 ];
 
 export function filterNavByRole(

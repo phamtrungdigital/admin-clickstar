@@ -25,7 +25,8 @@ const ROLE_LABEL: Record<string, string> = {
   accountant: "Kế toán",
   owner: "Owner",
   marketing_manager: "Marketing Manager",
-  viewer: "Viewer",
+  // Intentionally no "viewer" entry — customer audience renders nothing
+  // under the name (avoid the generic "Viewer" label that confused users).
 };
 
 export function UserMenu({
@@ -78,9 +79,11 @@ export function UserMenu({
           <p className="text-sm font-medium text-slate-900 leading-tight">
             {fullName || "User"}
           </p>
-          <p className="text-xs text-slate-500 leading-tight">
-            {ROLE_LABEL[role] ?? role}
-          </p>
+          {ROLE_LABEL[role] && (
+            <p className="text-xs text-slate-500 leading-tight">
+              {ROLE_LABEL[role]}
+            </p>
+          )}
         </div>
         <ChevronDown className="h-4 w-4 text-slate-400" />
       </DropdownMenuTrigger>

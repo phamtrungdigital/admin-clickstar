@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Headphones } from "lucide-react";
+import { ChevronRight, Headphones, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { ClickstarLogo } from "@/components/clickstar-logo";
@@ -68,6 +68,19 @@ export function SidebarContent({
         <ClickstarLogo variant="dark" size="sm" showTagline={false} />
       </div>
 
+      {audience === "customer" && (
+        <div className="border-b border-slate-200 px-3 py-3">
+          <Link
+            href="/tickets/new"
+            onClick={onNavigate}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Tạo ticket mới
+          </Link>
+        </div>
+      )}
+
       <ScrollArea className="min-h-0 flex-1 px-3 py-4">
         <nav className="flex flex-col gap-0.5">
           {items.map((item) => (
@@ -82,7 +95,7 @@ export function SidebarContent({
       </ScrollArea>
 
       <div className="border-t border-slate-200 px-3 py-4">
-        <SupportCard />
+        <SupportCard showHours={audience === "customer"} />
       </div>
     </>
   );
@@ -185,7 +198,7 @@ function SidebarItem({
   );
 }
 
-function SupportCard() {
+function SupportCard({ showHours = false }: { showHours?: boolean }) {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
       <div className="flex items-center gap-2">
@@ -205,6 +218,14 @@ function SupportCard() {
         <Headphones className="h-3.5 w-3.5" />
         Gửi yêu cầu hỗ trợ
       </button>
+      {showHours && (
+        <p className="mt-1 text-[10px] leading-tight text-slate-400">
+          <span className="block font-medium text-slate-500">
+            Thời gian làm việc:
+          </span>
+          Thứ 2 - Thứ 7 (8:30 - 18:00)
+        </p>
+      )}
     </div>
   );
 }

@@ -18,10 +18,10 @@ const PUBLIC_PATHS = [
 const CUSTOMER_ALLOWED_EXACT = new Set([
   "/dashboard",
   "/services",
-  "/tasks",
+  "/contracts",
   "/tickets",
   "/documents",
-  "/reports",
+  "/notifications",
   "/settings",
 ]);
 

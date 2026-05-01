@@ -17,6 +17,8 @@ export type TicketListParams = {
   status?: TicketStatus | "all" | "open";
   priority?: TicketPriority | "all";
   company_id?: string;
+  /** Filter to tickets where this user is reporter (customer "my tickets"). */
+  reporter_id?: string;
   page?: number;
   pageSize?: number;
 };
@@ -80,6 +82,10 @@ export async function listTickets(
     query = query.eq("company_id", params.company_id);
   }
 
+  if (params.reporter_id) {
+    query = query.eq("reporter_id", params.reporter_id);
+  }
+
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
@@ -108,6 +114,57 @@ export async function getTicketStats(): Promise<TicketStats> {
     if (OPEN_STATUSES.includes(row.status as TicketStatus)) stats.open += 1;
     if (row.status === "in_progress") stats.in_progress += 1;
     if (row.status === "resolved") stats.resolved += 1;
+  }
+  return stats;
+}
+
+export type CustomerTicketStats = {
+  total: number;
+  in_progress: number;
+  awaiting_customer: number;
+  resolved: number;
+  overdue: number;
+};
+
+/**
+ * Per-user ticket counters for the customer dashboard. Scoped by
+ * `reporter_id = userId` so a customer with no company link still sees
+ * their own tickets only.
+ */
+export async function getCustomerTicketStats(
+  userId: string,
+): Promise<CustomerTicketStats> {
+  const supabase = await createClient();
+  const nowIso = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("tickets")
+    .select("status, due_at, closed_at")
+    .eq("reporter_id", userId)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const stats: CustomerTicketStats = {
+    total: 0,
+    in_progress: 0,
+    awaiting_customer: 0,
+    resolved: 0,
+    overdue: 0,
+  };
+  for (const row of data ?? []) {
+    stats.total += 1;
+    if (row.status === "in_progress") stats.in_progress += 1;
+    if (row.status === "awaiting_customer") stats.awaiting_customer += 1;
+    if (row.status === "resolved" || row.status === "closed") {
+      stats.resolved += 1;
+    }
+    const open =
+      row.status === "new" ||
+      row.status === "in_progress" ||
+      row.status === "awaiting_customer";
+    if (open && row.due_at && row.due_at < nowIso) {
+      stats.overdue += 1;
+    }
   }
   return stats;
 }

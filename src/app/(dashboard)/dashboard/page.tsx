@@ -1,50 +1,83 @@
+import Link from "next/link";
+import { format } from "date-fns";
 import {
+  AlertOctagon,
   Building2,
   CheckCircle2,
   CircleAlert,
   Clock,
   FileSignature,
-  Mail,
+  Hourglass,
+  Inbox,
   MessageSquare,
-  Users,
+  TicketIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
+import {
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from "@/components/tickets/ticket-badges";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
   getInternalDashboardStats,
   type InternalDashboardStats,
 } from "@/lib/queries/dashboard";
+import {
+  getCustomerTicketStats,
+  listTickets,
+  type CustomerTicketStats,
+  type TicketListItem,
+} from "@/lib/queries/tickets";
 
 export const metadata: Metadata = {
   title: "Tổng quan | Portal.Clickstar.vn",
 };
 
 export default async function DashboardPage() {
-  const { profile } = await getCurrentUser();
+  const { id: userId, profile } = await getCurrentUser();
   const isInternal = profile?.audience !== "customer";
   const greeting = pickGreeting(profile?.full_name);
 
-  const stats = isInternal
-    ? await getInternalDashboardStats().catch(() => null)
-    : null;
+  if (!isInternal) {
+    const [stats, ticketList] = await Promise.all([
+      getCustomerTicketStats(userId).catch(() => null),
+      listTickets({ reporter_id: userId, status: "all", pageSize: 5 }).catch(
+        () => null,
+      ),
+    ]);
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title={`Xin chào, ${greeting} 👋`}
+          description="Đây là tổng quan các yêu cầu và dịch vụ của bạn."
+          breadcrumb={[{ label: "Trang chủ" }, { label: "Tổng quan" }]}
+        />
+        <CustomerSummary stats={stats} />
+        <CustomerRecentTickets rows={ticketList?.rows ?? []} />
+      </div>
+    );
+  }
 
+  const stats = await getInternalDashboardStats().catch(() => null);
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Xin chào, ${greeting} 👋`}
-        description={
-          isInternal
-            ? "Tổng quan vận hành dịch vụ và chăm sóc khách hàng của Clickstar."
-            : "Theo dõi tiến độ dịch vụ và báo cáo của doanh nghiệp."
-        }
+        description="Tổng quan vận hành dịch vụ và chăm sóc khách hàng của Clickstar."
         breadcrumb={[{ label: "Trang chủ" }, { label: "Tổng quan" }]}
       />
-
-      {isInternal ? <InternalSummary stats={stats} /> : <CustomerSummary />}
-
+      <InternalSummary stats={stats} />
       <div className="grid gap-6 lg:grid-cols-2">
         <PlaceholderPanel
           title="Hợp đồng cần xử lý"
@@ -92,28 +125,113 @@ function InternalSummary({ stats }: { stats: InternalDashboardStats | null }) {
   );
 }
 
-function CustomerSummary() {
+function CustomerSummary({ stats }: { stats: CustomerTicketStats | null }) {
+  const fmt = (n: number | undefined) =>
+    n === undefined ? "—" : n.toLocaleString("vi-VN");
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
       <StatsCard
-        label="Dịch vụ đang triển khai"
-        value="—"
-        icon={Users}
+        label="Tổng ticket"
+        value={fmt(stats?.total)}
+        icon={Inbox}
         tone="blue"
       />
       <StatsCard
-        label="Hạng mục hoàn thành"
-        value="—"
+        label="Đang xử lý"
+        value={fmt(stats?.in_progress)}
+        icon={Hourglass}
+        tone="violet"
+      />
+      <StatsCard
+        label="Chờ phản hồi"
+        value={fmt(stats?.awaiting_customer)}
+        icon={MessageSquare}
+        tone="amber"
+      />
+      <StatsCard
+        label="Đã hoàn thành"
+        value={fmt(stats?.resolved)}
         icon={CheckCircle2}
         tone="emerald"
       />
-      <StatsCard label="Ticket đang mở" value="—" icon={MessageSquare} tone="amber" />
       <StatsCard
-        label="Báo cáo gần nhất"
-        value="—"
-        icon={Mail}
-        tone="violet"
+        label="Ticket quá hạn"
+        value={fmt(stats?.overdue)}
+        icon={AlertOctagon}
+        tone="rose"
       />
+    </div>
+  );
+}
+
+function CustomerRecentTickets({ rows }: { rows: TicketListItem[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            Ticket của tôi
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            5 yêu cầu gần nhất bạn đã gửi.
+          </p>
+        </div>
+        <Link
+          href="/tickets"
+          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          Xem tất cả →
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-12 text-center">
+          <TicketIcon className="mx-auto h-10 w-10 text-slate-300" />
+          <h4 className="mt-3 text-sm font-semibold text-slate-900">
+            Chưa có ticket nào
+          </h4>
+          <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+            Tạo ticket mới ở thanh bên trái để gửi yêu cầu hỗ trợ tới Clickstar.
+          </p>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Mã ticket</TableHead>
+              <TableHead>Tiêu đề</TableHead>
+              <TableHead>Trạng thái</TableHead>
+              <TableHead>Mức độ</TableHead>
+              <TableHead>Cập nhật cuối</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="font-mono text-xs text-slate-500">
+                  {row.code ?? `#${row.id.slice(0, 6)}`}
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/tickets/${row.id}`}
+                    className="font-medium text-slate-900 hover:text-blue-700"
+                  >
+                    {row.title}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <TicketStatusBadge status={row.status} />
+                </TableCell>
+                <TableCell>
+                  <TicketPriorityBadge priority={row.priority} />
+                </TableCell>
+                <TableCell className="text-sm text-slate-500">
+                  {format(new Date(row.updated_at ?? row.created_at), "dd/MM/yyyy")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }

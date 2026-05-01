@@ -235,3 +235,56 @@ export async function listInternalStaff(): Promise<
   if (error) throw new Error(error.message);
   return data ?? [];
 }
+
+export type CompanyMember = {
+  user_id: string;
+  role: "owner" | "marketing_manager" | "viewer";
+  created_at: string;
+  profile: {
+    id: string;
+    full_name: string;
+    email: string | null;
+    is_active: boolean;
+  };
+};
+
+/** Customer profiles linked to a company via `company_members`. */
+export async function listCompanyMembers(
+  companyId: string,
+): Promise<CompanyMember[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("company_members")
+    .select(
+      `
+      user_id,
+      role,
+      created_at,
+      profile:profiles!company_members_user_id_fkey (
+        id,
+        full_name,
+        email,
+        is_active
+      )
+      `,
+    )
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    user_id: string;
+    role: CompanyMember["role"];
+    created_at: string;
+    profile: CompanyMember["profile"] | null;
+  };
+
+  return ((data ?? []) as unknown as Row[])
+    .filter((r): r is Row & { profile: CompanyMember["profile"] } => !!r.profile)
+    .map((r) => ({
+      user_id: r.user_id,
+      role: r.role,
+      created_at: r.created_at,
+      profile: r.profile,
+    }));
+}

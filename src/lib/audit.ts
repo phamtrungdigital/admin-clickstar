@@ -17,6 +17,7 @@ export type AuditAction =
 export type AuditEntityType =
   | "profile"
   | "company"
+  | "company_member"
   | "contract"
   | "service"
   | "task"

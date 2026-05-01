@@ -33,7 +33,6 @@ import {
 import type { ContractStatus } from "@/lib/database.types";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
-import { ComingSoon } from "@/components/dashboard/coming-soon";
 
 export const metadata = { title: "Hợp đồng | Portal.Clickstar.vn" };
 
@@ -49,16 +48,7 @@ export default async function ContractsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const { profile } = await getCurrentUser();
-  if (!isInternal(profile)) {
-    return (
-      <ComingSoon
-        title="Hợp đồng"
-        description="Hợp đồng dịch vụ của doanh nghiệp bạn — sẽ hiển thị khi tài khoản được Clickstar gắn vào doanh nghiệp."
-        breadcrumb={[{ label: "Trang chủ", href: "/dashboard" }, { label: "Hợp đồng" }]}
-        phase="2"
-      />
-    );
-  }
+  const canManage = isInternal(profile);
   const params = await searchParams;
   const status = (params.status as ContractStatus | "all" | undefined) ?? "all";
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
@@ -86,18 +76,24 @@ export default async function ContractsPage({
     <div className="space-y-6">
       <PageHeader
         title="Hợp đồng"
-        description="Tất cả hợp đồng dịch vụ với khách hàng."
+        description={
+          canManage
+            ? "Tất cả hợp đồng dịch vụ với khách hàng."
+            : "Hợp đồng dịch vụ của doanh nghiệp bạn với Clickstar."
+        }
         breadcrumb={[{ label: "Trang chủ", href: "/dashboard" }, { label: "Hợp đồng" }]}
         actions={
-          <Link
-            href="/contracts/new"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "bg-blue-600 px-4 text-white hover:bg-blue-700",
-            )}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Thêm hợp đồng
-          </Link>
+          canManage ? (
+            <Link
+              href="/contracts/new"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Thêm hợp đồng
+            </Link>
+          ) : null
         }
       />
 
@@ -133,7 +129,7 @@ export default async function ContractsPage({
       {loadError ? (
         <ErrorPanel message={loadError} />
       ) : (
-        <ContractTable rows={listResult.rows} />
+        <ContractTable rows={listResult.rows} canManage={canManage} />
       )}
 
       {!loadError && (
@@ -152,14 +148,28 @@ export default async function ContractsPage({
   );
 }
 
-function ContractTable({ rows }: { rows: ContractListItem[] }) {
+function ContractTable({
+  rows,
+  canManage,
+}: {
+  rows: ContractListItem[];
+  canManage: boolean;
+}) {
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
         <FileSignature className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">Chưa có hợp đồng</h3>
+        <h3 className="mt-3 text-base font-semibold text-slate-900">
+          {canManage ? "Chưa có hợp đồng" : "Chưa có hợp đồng nào"}
+        </h3>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Bấm <strong>Thêm hợp đồng</strong> ở góc trên để tạo hợp đồng đầu tiên.
+          {canManage ? (
+            <>
+              Bấm <strong>Thêm hợp đồng</strong> ở góc trên để tạo hợp đồng đầu tiên.
+            </>
+          ) : (
+            "Khi Clickstar tạo hợp đồng cho doanh nghiệp bạn, danh sách sẽ hiện ở đây."
+          )}
         </p>
       </div>
     );
@@ -172,12 +182,12 @@ function ContractTable({ rows }: { rows: ContractListItem[] }) {
           <TableRow>
             <TableHead className="w-32">Mã</TableHead>
             <TableHead>Hợp đồng</TableHead>
-            <TableHead>Khách hàng</TableHead>
+            {canManage && <TableHead>Khách hàng</TableHead>}
             <TableHead className="text-right">Giá trị (VND)</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead>Bắt đầu</TableHead>
             <TableHead>Kết thúc</TableHead>
-            <TableHead className="w-12 text-right">{""}</TableHead>
+            {canManage && <TableHead className="w-12 text-right">{""}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -199,18 +209,20 @@ function ContractTable({ rows }: { rows: ContractListItem[] }) {
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-slate-700">
-                {row.company ? (
-                  <Link
-                    href={`/customers/${row.company.id}`}
-                    className="hover:text-blue-700"
-                  >
-                    {row.company.name}
-                  </Link>
-                ) : (
-                  "—"
-                )}
-              </TableCell>
+              {canManage && (
+                <TableCell className="text-sm text-slate-700">
+                  {row.company ? (
+                    <Link
+                      href={`/customers/${row.company.id}`}
+                      className="hover:text-blue-700"
+                    >
+                      {row.company.name}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+              )}
               <TableCell className="text-right font-medium text-slate-700">
                 {Number(row.total_value).toLocaleString("vi-VN")}
               </TableCell>
@@ -223,9 +235,11 @@ function ContractTable({ rows }: { rows: ContractListItem[] }) {
               <TableCell className="text-sm text-slate-500">
                 {row.ends_at ? format(new Date(row.ends_at), "dd/MM/yyyy") : "—"}
               </TableCell>
-              <TableCell className="text-right">
-                <ContractRowMenu id={row.id} name={row.name} />
-              </TableCell>
+              {canManage && (
+                <TableCell className="text-right">
+                  <ContractRowMenu id={row.id} name={row.name} />
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

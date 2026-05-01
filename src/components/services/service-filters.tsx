@@ -20,7 +20,13 @@ const STATUS_OPTIONS = [
   { value: "paused", label: "Tạm ngưng" },
 ];
 
-export function ServiceFilters({ categories }: { categories: string[] }) {
+export function ServiceFilters({
+  categories,
+  hideStatus = false,
+}: {
+  categories: string[];
+  hideStatus?: boolean;
+}) {
   const searchParams = useSearchParams();
   const initialQ = searchParams.get("q") ?? "";
   const initialStatus = searchParams.get("status") ?? "all";
@@ -32,6 +38,7 @@ export function ServiceFilters({ categories }: { categories: string[] }) {
       initialQ={initialQ}
       initialStatus={initialStatus}
       initialCategory={initialCategory}
+      hideStatus={hideStatus}
     />
   );
 }
@@ -41,11 +48,13 @@ function ServiceFiltersImpl({
   initialQ,
   initialStatus,
   initialCategory,
+  hideStatus,
 }: {
   categories: string[];
   initialQ: string;
   initialStatus: string;
   initialCategory: string;
+  hideStatus: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -114,25 +123,27 @@ function ServiceFiltersImpl({
           </SelectContent>
         </Select>
       </div>
-      <div className="sm:w-44">
-        <label className="text-xs font-medium text-slate-500">Trạng thái</label>
-        <Select value={status} onValueChange={(v) => apply({ status: v })}>
-          <SelectTrigger className="mt-1 w-full">
-            <SelectValue>
-              {(value: string | null) =>
-                STATUS_OPTIONS.find((o) => o.value === value)?.label ?? "—"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {!hideStatus && (
+        <div className="sm:w-44">
+          <label className="text-xs font-medium text-slate-500">Trạng thái</label>
+          <Select value={status} onValueChange={(v) => apply({ status: v })}>
+            <SelectTrigger className="mt-1 w-full">
+              <SelectValue>
+                {(value: string | null) =>
+                  STATUS_OPTIONS.find((o) => o.value === value)?.label ?? "—"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Button type="button" onClick={() => apply({})}>
         Áp dụng
       </Button>

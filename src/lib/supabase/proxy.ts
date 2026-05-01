@@ -30,6 +30,8 @@ function isCustomerAllowed(pathname: string): boolean {
   // Allow nested ticket routes — customers create + view their own tickets.
   if (pathname.startsWith("/tickets/new")) return true;
   if (/^\/tickets\/[^/]+$/.test(pathname)) return true;
+  // Allow read-only contract detail (no /new, no /edit).
+  if (/^\/contracts\/[^/]+$/.test(pathname)) return true;
   return false;
 }
 

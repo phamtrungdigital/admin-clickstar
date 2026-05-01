@@ -217,3 +217,122 @@ export async function createCustomerAndRedirect(
   if (!result.ok) return result;
   redirect(`/customers/${result.data!.id}`);
 }
+
+const CUSTOMER_ROLES = ["owner", "marketing_manager", "viewer"] as const;
+type CustomerRole = (typeof CUSTOMER_ROLES)[number];
+
+export async function addCompanyMemberByEmailAction(
+  companyId: string,
+  email: string,
+  role: CustomerRole = "viewer",
+): Promise<ActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
+
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+    return { ok: false, message: "Email không hợp lệ" };
+  }
+  if (!CUSTOMER_ROLES.includes(role)) {
+    return { ok: false, message: "Vai trò không hợp lệ" };
+  }
+
+  const supabase = await createClient();
+
+  const { data: profile, error: lookupErr } = await supabase
+    .from("profiles")
+    .select("id, audience, full_name, email")
+    .eq("email", trimmed)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (lookupErr) return { ok: false, message: lookupErr.message };
+  if (!profile) {
+    return {
+      ok: false,
+      message: "Chưa có tài khoản nào dùng email này. Tạo tài khoản customer trước rồi gắn vào doanh nghiệp.",
+    };
+  }
+  if (profile.audience !== "customer") {
+    return {
+      ok: false,
+      message: "Chỉ tài khoản customer mới gắn được vào doanh nghiệp.",
+    };
+  }
+
+  const { error: insertErr } = await supabase
+    .from("company_members")
+    .upsert(
+      { company_id: companyId, user_id: profile.id, role },
+      { onConflict: "company_id,user_id" },
+    );
+  if (insertErr) return { ok: false, message: insertErr.message };
+
+  await logAudit({
+    user_id: guard.profile.id,
+    company_id: companyId,
+    action: "update",
+    entity_type: "company_member",
+    entity_id: profile.id,
+    new_value: { email: profile.email, role },
+  });
+
+  revalidatePath(`/customers/${companyId}`);
+  return { ok: true };
+}
+
+export async function updateCompanyMemberRoleAction(
+  companyId: string,
+  userId: string,
+  role: CustomerRole,
+): Promise<ActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  if (!CUSTOMER_ROLES.includes(role)) {
+    return { ok: false, message: "Vai trò không hợp lệ" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("company_members")
+    .update({ role })
+    .eq("company_id", companyId)
+    .eq("user_id", userId);
+  if (error) return { ok: false, message: error.message };
+
+  await logAudit({
+    user_id: guard.profile.id,
+    company_id: companyId,
+    action: "update",
+    entity_type: "company_member",
+    entity_id: userId,
+    new_value: { role },
+  });
+
+  revalidatePath(`/customers/${companyId}`);
+  return { ok: true };
+}
+
+export async function removeCompanyMemberAction(
+  companyId: string,
+  userId: string,
+): Promise<ActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("company_members")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("user_id", userId);
+  if (error) return { ok: false, message: error.message };
+
+  await logAudit({
+    user_id: guard.profile.id,
+    company_id: companyId,
+    action: "delete",
+    entity_type: "company_member",
+    entity_id: userId,
+  });
+
+  revalidatePath(`/customers/${companyId}`);
+  return { ok: true };
+}

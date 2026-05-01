@@ -129,3 +129,63 @@ export async function listDistinctServiceCategories(): Promise<string[]> {
   }
   return Array.from(set).sort();
 }
+
+export type CustomerServiceItem = ServiceRow & {
+  company_id: string;
+  company_name: string | null;
+};
+
+/**
+ * Services that the current customer's companies are using, via
+ * `company_services` (RLS auto-scopes to `current_customer_companies()`).
+ * One row per (company, service) link, so a service used by two of the
+ * customer's companies will appear twice with different company labels.
+ */
+export async function listCustomerCompanyServices(
+  params: { search?: string; category?: string | "all" } = {},
+): Promise<CustomerServiceItem[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("company_services")
+    .select(
+      `
+      company_id,
+      company:companies!company_services_company_id_fkey ( id, name ),
+      service:services!company_services_service_id_fkey ( * )
+      `,
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  type Row = {
+    company_id: string;
+    company: { id: string; name: string } | null;
+    service: ServiceRow | null;
+  };
+
+  const search = params.search?.trim().toLowerCase() ?? "";
+  const category = params.category && params.category !== "all" ? params.category : null;
+
+  const rows: CustomerServiceItem[] = [];
+  for (const row of (data ?? []) as unknown as Row[]) {
+    if (!row.service) continue;
+    if (category && row.service.category !== category) continue;
+    if (
+      search &&
+      !(
+        row.service.name.toLowerCase().includes(search) ||
+        (row.service.code ?? "").toLowerCase().includes(search) ||
+        (row.service.category ?? "").toLowerCase().includes(search)
+      )
+    ) {
+      continue;
+    }
+    rows.push({
+      ...row.service,
+      company_id: row.company_id,
+      company_name: row.company?.name ?? null,
+    });
+  }
+  return rows;
+}

@@ -27,6 +27,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getContractById } from "@/lib/queries/contracts";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
 
 export const metadata = { title: "Chi tiết hợp đồng | Portal.Clickstar.vn" };
 
@@ -36,6 +38,8 @@ export default async function ContractDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { profile } = await getCurrentUser();
+  const canManage = isInternal(profile);
   const contract = await getContractById(id).catch(() => null);
   if (!contract) notFound();
 
@@ -66,15 +70,17 @@ export default async function ContractDetailPage({
             >
               Quay lại
             </Link>
-            <Link
-              href={`/contracts/${contract.id}/edit`}
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "bg-blue-600 px-4 text-white hover:bg-blue-700",
-              )}
-            >
-              <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
-            </Link>
+            {canManage && (
+              <Link
+                href={`/contracts/${contract.id}/edit`}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "bg-blue-600 px-4 text-white hover:bg-blue-700",
+                )}
+              >
+                <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
+              </Link>
+            )}
           </>
         }
       />
@@ -104,6 +110,7 @@ export default async function ContractDetailPage({
               <ServicesTab
                 services={contract.services}
                 servicesTotal={servicesTotal}
+                canManage={canManage}
               />
             </TabsContent>
             <TabsContent value="attachment" className="mt-4">
@@ -111,6 +118,7 @@ export default async function ContractDetailPage({
                 contractId={contract.id}
                 url={contract.attachment_url}
                 filename={contract.attachment_filename}
+                canManage={canManage}
               />
             </TabsContent>
           </Tabs>
@@ -204,9 +212,11 @@ function InfoCard({
 function ServicesTab({
   services,
   servicesTotal,
+  canManage,
 }: {
   services: NonNullable<Awaited<ReturnType<typeof getContractById>>>["services"];
   servicesTotal: number;
+  canManage: boolean;
 }) {
   if (services.length === 0) {
     return (
@@ -216,7 +226,9 @@ function ServicesTab({
           Chưa gắn dịch vụ
         </h3>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Sửa hợp đồng để thêm các dịch vụ Clickstar cung cấp theo hợp đồng này.
+          {canManage
+            ? "Sửa hợp đồng để thêm các dịch vụ Clickstar cung cấp theo hợp đồng này."
+            : "Hợp đồng này chưa có dịch vụ nào được khai báo."}
         </p>
       </div>
     );
@@ -275,10 +287,12 @@ function AttachmentTab({
   contractId,
   url,
   filename,
+  canManage,
 }: {
   contractId: string;
   url: string | null;
   filename: string | null;
+  canManage: boolean;
 }) {
   if (!url) {
     return (
@@ -288,7 +302,9 @@ function AttachmentTab({
           Chưa có tệp đính kèm
         </h3>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Sửa hợp đồng để upload PDF hoặc dán đường dẫn online (Google Drive, Dropbox…).
+          {canManage
+            ? "Sửa hợp đồng để upload PDF hoặc dán đường dẫn online (Google Drive, Dropbox…)."
+            : "Hợp đồng này hiện chưa được đính kèm tệp PDF."}
         </p>
       </div>
     );

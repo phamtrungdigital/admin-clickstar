@@ -28,8 +28,10 @@ import {
 } from "@/components/ui/table";
 import {
   getServiceStats,
+  listCustomerCompanyServices,
   listDistinctServiceCategories,
   listServices,
+  type CustomerServiceItem,
   type ServiceListItem,
 } from "@/lib/queries/services";
 
@@ -63,15 +65,30 @@ export default async function ServicesPage({
     page: 1,
     pageSize: 20,
   };
+  let customerRows: CustomerServiceItem[] = [];
   let categories: string[] = [];
   let loadError: string | null = null;
 
   try {
-    [stats, listResult, categories] = await Promise.all([
-      getServiceStats(),
-      listServices({ search, status, category, page }),
-      listDistinctServiceCategories(),
-    ]);
+    if (canManage) {
+      [stats, listResult, categories] = await Promise.all([
+        getServiceStats(),
+        listServices({ search, status, category, page }),
+        listDistinctServiceCategories(),
+      ]);
+    } else {
+      customerRows = await listCustomerCompanyServices({ search, category });
+      const customerCategories = new Set<string>();
+      for (const r of customerRows) {
+        if (r.category) customerCategories.add(r.category);
+      }
+      categories = Array.from(customerCategories).sort();
+      stats = {
+        total: customerRows.length,
+        active: customerRows.filter((r) => r.is_active).length,
+        paused: customerRows.filter((r) => !r.is_active).length,
+      };
+    }
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Không tải được dữ liệu";
   }
@@ -116,15 +133,17 @@ export default async function ServicesPage({
         />
       </div>
 
-      <ServiceFilters categories={categories} />
+      <ServiceFilters categories={categories} hideStatus={!canManage} />
 
       {loadError ? (
         <ErrorPanel message={loadError} />
-      ) : (
+      ) : canManage ? (
         <ServiceTable rows={listResult.rows} canManage={canManage} />
+      ) : (
+        <CustomerServiceTable rows={customerRows} />
       )}
 
-      {!loadError && (
+      {!loadError && canManage && (
         <Pagination
           total={listResult.total}
           page={listResult.page}
@@ -137,6 +156,56 @@ export default async function ServicesPage({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function CustomerServiceTable({ rows }: { rows: CustomerServiceItem[] }) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+        <Package className="mx-auto h-10 w-10 text-slate-300" />
+        <h3 className="mt-3 text-base font-semibold text-slate-900">
+          Chưa có dịch vụ nào đang dùng
+        </h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+          Khi Clickstar kích hoạt dịch vụ trong hợp đồng, danh sách sẽ hiện ở đây.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Dịch vụ</TableHead>
+            <TableHead>Danh mục</TableHead>
+            <TableHead>Trạng thái</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={`${row.company_id}:${row.id}`}>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-medium text-slate-900">{row.name}</span>
+                  {row.code && (
+                    <span className="font-mono text-xs text-slate-500">{row.code}</span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-sm text-slate-600">
+                {row.category ?? <span className="text-slate-400">—</span>}
+              </TableCell>
+              <TableCell>
+                <ServiceStatusBadge isActive={row.is_active} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

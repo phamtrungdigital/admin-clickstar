@@ -21,7 +21,8 @@ import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { CompanyStatusBadge } from "@/components/dashboard/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getCustomerById } from "@/lib/queries/customers";
+import { getCustomerById, listCompanyMembers } from "@/lib/queries/customers";
+import { MembersTab } from "@/components/customers/members-tab";
 
 export const metadata = { title: "Chi tiết khách hàng | Portal.Clickstar.vn" };
 
@@ -34,6 +35,7 @@ export default async function CustomerDetailPage({
 
   const customer = await getCustomerById(id).catch(() => null);
   if (!customer) notFound();
+  const members = await listCompanyMembers(customer.id).catch(() => []);
 
   return (
     <div className="space-y-6">
@@ -80,6 +82,7 @@ export default async function CustomerDetailPage({
           <Tabs defaultValue="info" className="w-full">
             <TabsList className="bg-white border border-slate-200 p-1">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
+              <TabsTrigger value="members">Tài khoản</TabsTrigger>
               <TabsTrigger value="contracts">Hợp đồng</TabsTrigger>
               <TabsTrigger value="services">Dịch vụ</TabsTrigger>
               <TabsTrigger value="documents">Tài liệu</TabsTrigger>
@@ -87,6 +90,9 @@ export default async function CustomerDetailPage({
             </TabsList>
             <TabsContent value="info" className="mt-4">
               <InfoCard customer={customer} />
+            </TabsContent>
+            <TabsContent value="members" className="mt-4">
+              <MembersTab companyId={customer.id} members={members} />
             </TabsContent>
             <TabsContent value="contracts" className="mt-4">
               <ComingSoonTab title="Hợp đồng" icon={FileSignature} phase="2" />

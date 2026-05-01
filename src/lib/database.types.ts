@@ -76,6 +76,12 @@ export type SnapshotStatus =
   | "rejected"
   | "rolled_back";
 
+export type ReportStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected";
+
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type TicketStatus =
@@ -480,12 +486,17 @@ export interface ReportRow extends Timestamps, SoftDeletable {
   project_id: string | null;
   title: string;
   description: string | null;
+  content: string | null;
+  status: ReportStatus;
   period_start: string | null;
   period_end: string | null;
   document_id: string | null;
   highlights: Json;
   is_published: boolean;
   published_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_reason: string | null;
   metadata: Json;
   created_by: string | null;
 }

@@ -2,13 +2,17 @@ import { format } from "date-fns";
 import {
   AlertCircle,
   Building2,
+  Camera,
   Edit,
   FileSignature,
+  ListChecks,
+  Package,
   Plus,
   Power,
   ShieldUser,
   Trash2,
   User,
+  UsersRound,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -63,7 +67,12 @@ const ENTITY_META: Record<
 > = {
   profile: { label: "Người dùng", icon: User },
   company: { label: "Khách hàng", icon: Building2 },
+  company_member: { label: "Tài khoản KH", icon: UsersRound },
   contract: { label: "Hợp đồng", icon: FileSignature },
+  service: { label: "Dịch vụ / Template / Snapshot", icon: Package },
+  task: { label: "Công việc", icon: ListChecks },
+  ticket: { label: "Ticket", icon: ListChecks },
+  document: { label: "Tài liệu", icon: FileSignature },
   role_permission: { label: "Phân quyền", icon: ShieldUser },
   system_settings: { label: "Cài đặt hệ thống", icon: ShieldUser },
 };
@@ -252,6 +261,64 @@ function describeChange(row: AuditListItem): string | null {
     const name = (newVal?.name ?? oldVal?.name) as string | undefined;
     if (row.action === "create" && name) return `Tạo hợp đồng "${name}"`;
     if (row.action === "delete") return "Xoá mềm hợp đồng";
+  }
+  if (row.entity_type === "company_member") {
+    if (row.action === "update") {
+      const role = newVal?.role as string | undefined;
+      const email = newVal?.email as string | undefined;
+      return `Gắn ${email ?? "tài khoản"} vào doanh nghiệp${role ? ` (vai trò ${role})` : ""}`;
+    }
+    if (row.action === "delete") return "Gỡ tài khoản khỏi doanh nghiệp";
+  }
+  if (row.entity_type === "task") {
+    const title = (newVal?.title ?? oldVal?.title) as string | undefined;
+    const action = newVal?.action as string | undefined;
+    if (row.action === "create" && title) return `Tạo task "${title}"`;
+    const oldStatus = oldVal?.status as string | undefined;
+    const newStatus = newVal?.status as string | undefined;
+    if (row.action === "update") {
+      if (action === "submit") return "Submit task chờ duyệt";
+      if (action === "approve") return "Duyệt task — hoàn thành";
+      if (action === "return") {
+        const reason = newVal?.reason as string | undefined;
+        return `Trả về task${reason ? ` (lý do: ${reason})` : ""}`;
+      }
+      if (action === "block") {
+        const reason = newVal?.reason as string | undefined;
+        return `Báo task bị chặn${reason ? ` (${reason})` : ""}`;
+      }
+      if (action === "unblock") return "Gỡ chặn task";
+      if (action === "start") return "Bắt đầu task";
+      if (action === "cancel") return "Huỷ task";
+      if (action === "awaiting_customer") return "Chờ phản hồi khách";
+      if (oldStatus && newStatus) return `Đổi trạng thái: ${oldStatus} → ${newStatus}`;
+    }
+  }
+  if (row.entity_type === "service") {
+    const kind = newVal?.kind as string | undefined;
+    if (kind === "snapshot") {
+      const action = newVal?.action as string | undefined;
+      const type = newVal?.type as string | undefined;
+      if (row.action === "create") return `Tạo snapshot${type ? ` (${type})` : ""}`;
+      if (action === "approved") return "Duyệt snapshot";
+      if (action === "rejected") {
+        const reason = newVal?.reason as string | undefined;
+        return `Từ chối snapshot${reason ? ` (${reason})` : ""}`;
+      }
+      if (action === "rolled_back") {
+        const reason = newVal?.reason as string | undefined;
+        return `Rollback snapshot${reason ? ` (${reason})` : ""}`;
+      }
+    }
+    // Project fork
+    if (newVal?.template_id) {
+      const taskCount = newVal?.task_count as number | undefined;
+      const milestoneCount = newVal?.milestone_count as number | undefined;
+      return `Fork template (${milestoneCount ?? 0} milestones, ${taskCount ?? 0} tasks)`;
+    }
+    if (row.action === "create" && newVal?.name) {
+      return `Tạo template "${newVal.name as string}"`;
+    }
   }
   return null;
 }

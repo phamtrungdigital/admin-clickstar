@@ -33,10 +33,17 @@ export const internalNav: NavItem[] = [
   { label: "Công việc", href: "/tasks", icon: ListChecks },
   { label: "Ticket", href: "/tickets", icon: Ticket },
   { label: "Tài liệu", href: "/documents", icon: FolderOpen },
-  { label: "Email Marketing", href: "/email", icon: Mail },
-  { label: "ZNS", href: "/zns", icon: MessageSquare },
+  {
+    label: "Marketing & Automation",
+    href: "/email",
+    icon: Workflow,
+    children: [
+      { label: "Email Marketing", href: "/email", icon: Mail },
+      { label: "ZNS", href: "/zns", icon: MessageSquare },
+      { label: "Automation", href: "/automation", icon: Workflow },
+    ],
+  },
   { label: "Báo cáo", href: "/reports", icon: BarChart3 },
-  { label: "Automation", href: "/automation", icon: Workflow },
   {
     label: "Quản trị hệ thống",
     href: "/admin",

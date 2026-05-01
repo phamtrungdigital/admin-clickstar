@@ -68,7 +68,7 @@ export function SidebarContent({
         <ClickstarLogo variant="dark" size="sm" showTagline={false} />
       </div>
 
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="min-h-0 flex-1 px-3 py-4">
         <nav className="flex flex-col gap-0.5">
           {items.map((item) => (
             <SidebarItem

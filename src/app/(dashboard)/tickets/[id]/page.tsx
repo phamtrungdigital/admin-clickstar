@@ -1,0 +1,173 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { format } from "date-fns";
+import { Building2, Pencil, User } from "lucide-react";
+
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/dashboard/page-header";
+import {
+  TicketPriorityBadge,
+  TicketStatusBadge,
+} from "@/components/tickets/ticket-badges";
+import { getTicketById } from "@/lib/queries/tickets";
+
+export const metadata = { title: "Chi tiết ticket | Portal.Clickstar.vn" };
+
+export default async function TicketDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const ticket = await getTicketById(id).catch(() => null);
+  if (!ticket) notFound();
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title={ticket.title}
+        breadcrumb={[
+          { label: "Trang chủ", href: "/dashboard" },
+          { label: "Ticket", href: "/tickets" },
+          { label: ticket.title },
+        ]}
+        actions={
+          <>
+            <Link
+              href="/tickets"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "px-4",
+              )}
+            >
+              Quay lại
+            </Link>
+            <Link
+              href={`/tickets/${ticket.id}/edit`}
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
+            >
+              <Pencil className="mr-2 h-4 w-4" /> Chỉnh sửa
+            </Link>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <TicketStatusBadge status={ticket.status} />
+        <TicketPriorityBadge priority={ticket.priority} />
+        {ticket.code && (
+          <span className="font-mono text-xs text-slate-500">{ticket.code}</span>
+        )}
+        <span className="text-xs text-slate-400">
+          Tạo {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm")}
+        </span>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 className="mb-4 text-base font-semibold text-slate-900">
+              Mô tả
+            </h3>
+            {ticket.description ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                {ticket.description}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-400">Chưa có mô tả.</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Bình luận và lịch sử xử lý sẽ hiển thị tại đây ở phase sau.
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold text-slate-900">
+              Thông tin
+            </h3>
+            <dl className="space-y-3 text-sm">
+              <Row
+                icon={Building2}
+                label="Khách hàng"
+                value={
+                  ticket.company ? (
+                    <Link
+                      href={`/customers/${ticket.company.id}`}
+                      className="text-blue-700 hover:underline"
+                    >
+                      {ticket.company.name}
+                    </Link>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+              <Row
+                icon={User}
+                label="Phụ trách"
+                value={ticket.assignee?.full_name ?? "Chưa phân công"}
+              />
+            </dl>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">
+              Lịch sử
+            </h3>
+            <dl className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="text-slate-500">Tạo lúc</dt>
+                <dd className="text-slate-800">
+                  {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm")}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-slate-500">Cập nhật</dt>
+                <dd className="text-slate-800">
+                  {format(new Date(ticket.updated_at), "dd/MM/yyyy HH:mm")}
+                </dd>
+              </div>
+              {ticket.closed_at && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-slate-500">Đóng lúc</dt>
+                  <dd className="text-slate-800">
+                    {format(new Date(ticket.closed_at), "dd/MM/yyyy HH:mm")}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
+        <dt className="text-xs text-slate-500">{label}</dt>
+        <dd className="text-sm font-medium text-slate-800 text-right">{value}</dd>
+      </div>
+    </div>
+  );
+}

@@ -22,6 +22,7 @@ import {
   readSnapshotPayload,
 } from "@/lib/queries/snapshots";
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
+import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
 import { cn } from "@/lib/utils";
@@ -119,6 +120,11 @@ export default async function ProjectDetailPage({
           <ProgressOverview project={project} stats={stats} />
           <MilestonesSection milestones={project.milestones} />
           <TasksPreview tasks={project.tasks} />
+          <ProjectDocumentsSection
+            projectId={project.id}
+            companyId={project.company?.id}
+            canManage
+          />
         </div>
         <div className="space-y-6">
           <ProjectInfoCard project={project} />
@@ -166,6 +172,10 @@ async function CustomerView({
             {payload.tasks.length > 0 && (
               <CustomerTasksPreview tasks={payload.tasks} />
             )}
+            <ProjectDocumentsSection
+              projectId={project.id}
+              canManage={false}
+            />
           </div>
           <div className="space-y-6">
             <ProjectInfoCard project={project} />

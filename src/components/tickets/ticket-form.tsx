@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +28,10 @@ import {
   createTicketAction,
   updateTicketAction,
 } from "@/app/(dashboard)/tickets/actions";
-import { TicketAttachmentsField } from "./ticket-attachments-field";
+import {
+  TicketAttachmentsField,
+  type TicketAttachmentsFieldHandle,
+} from "./ticket-attachments-field";
 import { cn } from "@/lib/utils";
 
 const NO_ASSIGNEE = "__none__";
@@ -72,6 +75,32 @@ export function TicketForm({
   });
 
   const watchedCompanyId = useWatch({ control, name: "company_id" });
+  const attachmentsRef = useRef<TicketAttachmentsFieldHandle | null>(null);
+
+  const handleDescriptionPaste = (
+    e: React.ClipboardEvent<HTMLTextAreaElement>,
+  ) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.kind === "file") {
+        const f = it.getAsFile();
+        if (f) {
+          const named =
+            f.name === "image.png"
+              ? new File([f], `screenshot-${Date.now()}.png`, { type: f.type })
+              : f;
+          files.push(named);
+        }
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      attachmentsRef.current?.uploadFiles(files);
+    }
+  };
 
   const onSubmit = (values: CreateTicketInput) => {
     startTransition(async () => {
@@ -163,7 +192,8 @@ export function TicketForm({
             <Textarea
               {...register("description")}
               rows={5}
-              placeholder="Mô tả các bước tái hiện, expected vs actual..."
+              placeholder="Mô tả các bước tái hiện, expected vs actual. Có thể dán ảnh trực tiếp (Ctrl/Cmd + V)."
+              onPaste={handleDescriptionPaste}
             />
           </Field>
           <div className="md:col-span-2 space-y-1.5">
@@ -175,6 +205,7 @@ export function TicketForm({
               name="attachments"
               render={({ field }) => (
                 <TicketAttachmentsField
+                  ref={attachmentsRef}
                   companyId={watchedCompanyId || null}
                   value={field.value ?? []}
                   onChange={field.onChange}

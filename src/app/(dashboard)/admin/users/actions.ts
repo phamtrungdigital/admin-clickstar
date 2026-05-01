@@ -11,6 +11,7 @@ import {
   type UpdateUserInput,
 } from "@/lib/validation/users";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { logAudit } from "@/lib/audit";
 
 export type UserActionResult<T = void> =
   | { ok: true; data?: T }
@@ -95,6 +96,21 @@ export async function createUserAction(
     })
     .eq("id", created.user.id);
 
+  const { id: actorId } = await getCurrentUser();
+  await logAudit({
+    user_id: actorId,
+    action: "create",
+    entity_type: "profile",
+    entity_id: created.user.id,
+    new_value: {
+      email: data.email,
+      full_name: data.full_name,
+      audience: data.audience,
+      internal_role: data.internal_role,
+      is_active: data.is_active,
+    },
+  });
+
   revalidatePath("/admin/users");
   return { ok: true, data: { id: created.user.id } };
 }
@@ -116,11 +132,28 @@ export async function updateUserAction(
   }
 
   const supabase = await createClient();
+  // Snapshot the row before the update so we can compute the diff for audit.
+  const { data: before } = await supabase
+    .from("profiles")
+    .select("full_name, phone, audience, internal_role, is_active")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("profiles")
     .update(parsed.data)
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
+
+  const { id: actorId } = await getCurrentUser();
+  await logAudit({
+    user_id: actorId,
+    action: "update",
+    entity_type: "profile",
+    entity_id: id,
+    old_value: before,
+    new_value: parsed.data,
+  });
 
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${id}`);
@@ -140,6 +173,15 @@ export async function toggleUserActiveAction(
     .update({ is_active: next })
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
+
+  const { id: actorId } = await getCurrentUser();
+  await logAudit({
+    user_id: actorId,
+    action: next ? "activate" : "deactivate",
+    entity_type: "profile",
+    entity_id: id,
+    new_value: { is_active: next },
+  });
 
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${id}`);
@@ -188,6 +230,14 @@ export async function softDeleteUserAction(
     .update({ deleted_at: new Date().toISOString(), is_active: false })
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
+
+  const { id: actorId } = await getCurrentUser();
+  await logAudit({
+    user_id: actorId,
+    action: "delete",
+    entity_type: "profile",
+    entity_id: id,
+  });
 
   revalidatePath("/admin/users");
   return { ok: true };

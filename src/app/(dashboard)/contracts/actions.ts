@@ -11,6 +11,7 @@ import {
   type CreateContractInput,
   type UpdateContractInput,
 } from "@/lib/validation/contracts";
+import { logAudit } from "@/lib/audit";
 
 export type ContractActionResult<T = void> =
   | { ok: true; data?: T }
@@ -82,6 +83,20 @@ export async function createContractAction(
     }
   }
 
+  await logAudit({
+    user_id: user.id,
+    company_id: payload.company_id,
+    action: "create",
+    entity_type: "contract",
+    entity_id: contract.id,
+    new_value: {
+      name: payload.name,
+      code: payload.code,
+      status: payload.status,
+      total_value: payload.total_value,
+    },
+  });
+
   revalidatePath("/contracts");
   return { ok: true, data: { id: contract.id } };
 }
@@ -141,11 +156,31 @@ export async function softDeleteContractAction(
   id: string,
 ): Promise<ContractActionResult> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  // Snapshot company_id for the audit row.
+  const { data: before } = await supabase
+    .from("contracts")
+    .select("company_id, name")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("contracts")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
+
+  await logAudit({
+    user_id: user?.id ?? null,
+    company_id: before?.company_id ?? null,
+    action: "delete",
+    entity_type: "contract",
+    entity_id: id,
+    old_value: before,
+  });
+
   revalidatePath("/contracts");
   return { ok: true };
 }

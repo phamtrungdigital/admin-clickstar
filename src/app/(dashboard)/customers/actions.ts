@@ -11,6 +11,7 @@ import {
   type CreateCompanyInput,
   type UpdateCompanyInput,
 } from "@/lib/validation/companies";
+import { logAudit } from "@/lib/audit";
 
 export type ActionResult<T = void> =
   | { ok: true; data?: T }
@@ -91,6 +92,19 @@ export async function createCustomerAction(
     }
   }
 
+  await logAudit({
+    user_id: user.id,
+    company_id: company.id,
+    action: "create",
+    entity_type: "company",
+    entity_id: company.id,
+    new_value: {
+      name: payload.name,
+      code: payload.code,
+      status: payload.status,
+    },
+  });
+
   revalidatePath("/customers");
   return { ok: true, data: { id: company.id } };
 }
@@ -168,11 +182,23 @@ export async function updateCustomerAction(
 
 export async function softDeleteCustomerAction(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("companies")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) return { ok: false, message: error.message };
+
+  await logAudit({
+    user_id: user?.id ?? null,
+    company_id: id,
+    action: "delete",
+    entity_type: "company",
+    entity_id: id,
+  });
+
   revalidatePath("/customers");
   return { ok: true };
 }

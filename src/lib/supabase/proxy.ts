@@ -5,7 +5,10 @@ const PUBLIC_PATHS = [
   "/login",
   "/forgot-password",
   "/reset-password",
-  "/icons-demo.html",
+  // Favicon / app icons must be reachable to anonymous browsers (e.g. when
+  // showing the login page or before iOS's add-to-home-screen request).
+  "/icon",
+  "/apple-icon",
 ];
 
 export async function updateSession(request: NextRequest) {

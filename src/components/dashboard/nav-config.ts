@@ -30,9 +30,16 @@ export const internalNav: NavItem[] = [
   { label: "Khách hàng", href: "/customers", icon: Users },
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
   { label: "Dịch vụ", href: "/services", icon: Package },
-  { label: "Công việc", href: "/tasks", icon: ListChecks },
-  { label: "Ticket", href: "/tickets", icon: Ticket },
-  { label: "Tài liệu", href: "/documents", icon: FolderOpen },
+  {
+    label: "Vận hành",
+    href: "/tasks",
+    icon: ListChecks,
+    children: [
+      { label: "Công việc", href: "/tasks", icon: ListChecks },
+      { label: "Ticket", href: "/tickets", icon: Ticket },
+      { label: "Tài liệu", href: "/documents", icon: FolderOpen },
+    ],
+  },
   {
     label: "Marketing & Automation",
     href: "/email",
@@ -57,7 +64,6 @@ export const internalNav: NavItem[] = [
       { label: "Danh mục", href: "/admin/catalog", icon: FolderOpen },
     ],
   },
-  { label: "Cài đặt", href: "/settings", icon: Settings },
 ];
 
 /**

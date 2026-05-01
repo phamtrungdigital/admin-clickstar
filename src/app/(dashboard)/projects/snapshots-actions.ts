@@ -7,6 +7,12 @@ import { requireInternalAction } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
 import { buildSnapshotPayload } from "@/lib/queries/snapshots";
 import {
+  notifySnapshotApproved,
+  notifySnapshotCreated,
+  notifySnapshotRejected,
+  notifySnapshotRolledBack,
+} from "@/lib/notifications/snapshots";
+import {
   approveSnapshotSchema,
   createSnapshotSchema,
   rejectSnapshotSchema,
@@ -60,7 +66,7 @@ export async function createSnapshotAction(
   // Pull project + ensure caller can see it (RLS will also enforce on insert).
   const { data: project, error: pErr } = await supabase
     .from("projects")
-    .select("id, contract_id, company_id")
+    .select("id, name, contract_id, company_id")
     .eq("id", parsed.data.project_id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -111,8 +117,53 @@ export async function createSnapshotAction(
     },
   });
 
+  await notifySnapshotCreated(
+    {
+      snapshotId: snapshot.id,
+      projectId: parsed.data.project_id,
+      projectName: project.name as string,
+      companyId: project.company_id as string,
+      createdBy: user.id,
+    },
+    parsed.data.type,
+  );
+
   revalidatePath(`/projects/${parsed.data.project_id}`);
   return { ok: true, data: { id: snapshot.id } };
+}
+
+async function loadSnapshotContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  snapshotId: string,
+): Promise<{
+  snapshotId: string;
+  projectId: string;
+  projectName: string;
+  companyId: string;
+  createdBy: string;
+} | null> {
+  const { data, error } = await supabase
+    .from("snapshots")
+    .select(
+      "id, project_id, created_by, project:projects!snapshots_project_id_fkey ( id, name, company_id )",
+    )
+    .eq("id", snapshotId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const r = data as unknown as {
+    id: string;
+    project_id: string;
+    created_by: string;
+    project: { id: string; name: string; company_id: string } | null;
+  };
+  if (!r.project) return null;
+  return {
+    snapshotId: r.id,
+    projectId: r.project_id,
+    projectName: r.project.name,
+    companyId: r.project.company_id,
+    createdBy: r.created_by,
+  };
 }
 
 export async function approveSnapshotAction(
@@ -179,6 +230,9 @@ export async function approveSnapshotAction(
     new_value: { kind: "snapshot", action: "approved", type: row.type },
   });
 
+  const ctx = await loadSnapshotContext(supabase, snapshotId);
+  if (ctx) await notifySnapshotApproved(ctx);
+
   revalidatePath(`/projects/${row.project_id as string}`);
   return { ok: true };
 }
@@ -237,6 +291,9 @@ export async function rejectSnapshotAction(
     entity_id: snapshotId,
     new_value: { kind: "snapshot", action: "rejected", reason: parsed.data.reason },
   });
+
+  const ctx = await loadSnapshotContext(supabase, snapshotId);
+  if (ctx) await notifySnapshotRejected(ctx, parsed.data.reason);
 
   revalidatePath(`/projects/${row.project_id as string}`);
   return { ok: true };
@@ -318,6 +375,9 @@ export async function rollbackSnapshotAction(
       reason: parsed.data.reason,
     },
   });
+
+  const ctx = await loadSnapshotContext(supabase, snapshotId);
+  if (ctx) await notifySnapshotRolledBack(ctx, parsed.data.reason);
 
   revalidatePath(`/projects/${existing.project_id as string}`);
   return { ok: true };

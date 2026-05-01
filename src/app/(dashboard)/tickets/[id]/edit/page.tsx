@@ -46,6 +46,7 @@ export default async function EditTicketPage({
           priority: ticket.priority,
           status: ticket.status,
           assignee_id: ticket.assignee_id,
+          attachments: ticket.attachments ?? [],
         }}
       />
     </div>

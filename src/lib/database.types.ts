@@ -238,6 +238,14 @@ export interface TaskCommentRow extends Timestamps, SoftDeletable {
   attachments: Json;
 }
 
+export interface TicketAttachment {
+  path: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  uploaded_at: string;
+}
+
 export interface TicketRow extends Timestamps, SoftDeletable {
   id: string;
   code: string | null;
@@ -251,6 +259,7 @@ export interface TicketRow extends Timestamps, SoftDeletable {
   reporter_id: string | null;
   closed_at: string | null;
   metadata: Json;
+  attachments: TicketAttachment[];
   created_by: string | null;
 }
 

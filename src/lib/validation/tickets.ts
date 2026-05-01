@@ -17,6 +17,16 @@ const trimmed = z.string().trim();
  * field types stay aligned with React Hook Form. Use `normalizeTicketInput()`
  * before persisting to coerce empty strings to null.
  */
+export const ticketAttachmentSchema = z.object({
+  path: z.string().min(1),
+  filename: z.string().min(1),
+  content_type: z.string().min(1),
+  size: z.number().int().nonnegative(),
+  uploaded_at: z.string(),
+});
+
+export type TicketAttachmentInput = z.infer<typeof ticketAttachmentSchema>;
+
 export const createTicketSchema = z.object({
   title: trimmed.min(2, "Tiêu đề tối thiểu 2 ký tự").max(255),
   code: trimmed.max(255),
@@ -25,6 +35,7 @@ export const createTicketSchema = z.object({
   priority: z.enum(TICKET_PRIORITY),
   status: z.enum(TICKET_STATUS),
   assignee_id: z.string().uuid().nullable(),
+  attachments: z.array(ticketAttachmentSchema),
 });
 
 export const updateTicketSchema = createTicketSchema.partial();

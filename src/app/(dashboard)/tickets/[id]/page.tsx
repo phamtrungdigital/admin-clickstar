@@ -10,7 +10,9 @@ import {
   TicketPriorityBadge,
   TicketStatusBadge,
 } from "@/components/tickets/ticket-badges";
+import { TicketAttachmentsDisplay } from "@/components/tickets/ticket-attachments-display";
 import { getTicketById } from "@/lib/queries/tickets";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Chi tiết ticket | Portal.Clickstar.vn" };
 
@@ -22,6 +24,23 @@ export default async function TicketDetailPage({
   const { id } = await params;
   const ticket = await getTicketById(id).catch(() => null);
   if (!ticket) notFound();
+
+  // Pre-sign attachment URLs server-side so the client doesn't need to make
+  // a round-trip on render.
+  const attachments = ticket.attachments ?? [];
+  const urls: Record<string, string> = {};
+  if (attachments.length > 0) {
+    const supabase = await createClient();
+    const { data } = await supabase.storage
+      .from("documents")
+      .createSignedUrls(
+        attachments.map((a) => a.path),
+        60 * 60,
+      );
+    for (const item of data ?? []) {
+      if (item.signedUrl && item.path) urls[item.path] = item.signedUrl;
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -80,6 +99,13 @@ export default async function TicketDetailPage({
             ) : (
               <p className="text-sm text-slate-400">Chưa có mô tả.</p>
             )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 className="mb-4 text-base font-semibold text-slate-900">
+              Tệp đính kèm
+            </h3>
+            <TicketAttachmentsDisplay attachments={attachments} urls={urls} />
           </div>
 
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ import {
   createTicketAction,
   updateTicketAction,
 } from "@/app/(dashboard)/tickets/actions";
+import { TicketAttachmentsField } from "./ticket-attachments-field";
 import { cn } from "@/lib/utils";
 
 const NO_ASSIGNEE = "__none__";
@@ -66,8 +67,11 @@ export function TicketForm({
       priority: defaultValues?.priority ?? "medium",
       status: defaultValues?.status ?? "new",
       assignee_id: defaultValues?.assignee_id ?? null,
+      attachments: defaultValues?.attachments ?? [],
     },
   });
+
+  const watchedCompanyId = useWatch({ control, name: "company_id" });
 
   const onSubmit = (values: CreateTicketInput) => {
     startTransition(async () => {
@@ -159,9 +163,25 @@ export function TicketForm({
             <Textarea
               {...register("description")}
               rows={5}
-              placeholder="Mô tả các bước tái hiện, screenshot, expected vs actual..."
+              placeholder="Mô tả các bước tái hiện, expected vs actual..."
             />
           </Field>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-sm font-medium text-slate-700">
+              Tệp đính kèm
+            </Label>
+            <Controller
+              control={control}
+              name="attachments"
+              render={({ field }) => (
+                <TicketAttachmentsField
+                  companyId={watchedCompanyId || null}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
         </div>
       </FormSection>
 

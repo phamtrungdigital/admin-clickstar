@@ -61,14 +61,14 @@ export function LoginForm() {
             className="rounded-lg gap-2 text-sm font-medium text-slate-500 data-active:text-slate-900 data-active:bg-white data-active:shadow-sm data-active:ring-1 data-active:ring-slate-200/80"
           >
             <User className="h-4 w-4" />
-            Đăng nhập nội bộ
+            Nội bộ
           </TabsTrigger>
           <TabsTrigger
             value="customer"
             className="rounded-lg gap-2 text-sm font-medium text-slate-500 data-active:text-slate-900 data-active:bg-white data-active:shadow-sm data-active:ring-1 data-active:ring-slate-200/80"
           >
             <BuildingIcon />
-            Đăng nhập khách hàng
+            Khách hàng
           </TabsTrigger>
         </TabsList>
       </Tabs>

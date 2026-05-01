@@ -3,7 +3,6 @@ import {
   Activity,
   BarChart3,
   Cpu,
-  Globe,
   Headphones,
   Headset,
   Network,
@@ -58,36 +57,19 @@ export default function LoginPage() {
   return (
     <div className="grid h-svh lg:grid-cols-[1.1fr_1fr]">
       <BrandPanel />
-      <div className="flex flex-col justify-center px-6 py-6 sm:px-10 lg:px-12 lg:py-8">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-6">
-          {/* Mobile-only logo: brand panel is hidden below lg, so show
-              the wordmark here so users still see the Clickstar identity. */}
-          <div className="flex items-center justify-between gap-3 lg:hidden">
+      <div className="flex flex-col justify-center px-6 py-8 sm:px-10 lg:px-12 lg:py-8">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-7">
+          {/* Mobile-only logo (brand panel is hidden below lg). */}
+          <div className="flex justify-center lg:hidden">
             <ClickstarLogo variant="dark" size="md" showTagline={false} />
-            <button
-              type="button"
-              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Globe className="h-4 w-4 text-slate-500" />
-              Tiếng Việt
-            </button>
           </div>
 
-          {/* Desktop: language switcher only (logo lives in the brand panel) */}
-          <div className="hidden justify-end lg:flex">
-            <button
-              type="button"
-              className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <Globe className="h-4 w-4 text-slate-500" />
-              Tiếng Việt
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">Đăng nhập</h1>
+          <div className="space-y-2 text-center lg:text-left">
+            <h1 className="text-2xl font-bold text-slate-900 lg:text-3xl">
+              Đăng nhập
+            </h1>
             <p className="text-sm text-slate-500">
-              Chào mừng bạn quay trở lại Portal.Clickstar.vn
+              Chào mừng bạn đến hệ thống Portal Click Star
             </p>
           </div>
 

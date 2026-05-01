@@ -316,9 +316,12 @@ function TasksTable({
               <TableRow key={task.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">
+                    <Link
+                      href={`/tasks/${task.id}`}
+                      className="text-sm font-medium text-slate-900 hover:text-blue-700"
+                    >
                       {task.title}
-                    </span>
+                    </Link>
                     {task.is_extra && (
                       <span
                         className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200"

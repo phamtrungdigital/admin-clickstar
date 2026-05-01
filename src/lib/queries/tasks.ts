@@ -1,7 +1,13 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { TaskRow, TaskStatus, TaskPriority } from "@/lib/database.types";
+import type {
+  TaskChecklistItemRow,
+  TaskCommentRow,
+  TaskRow,
+  TaskStatus,
+  TaskPriority,
+} from "@/lib/database.types";
 
 export type TaskListItem = TaskRow & {
   project: { id: string; name: string } | null;
@@ -105,6 +111,76 @@ export async function listTasks(
 
   const rows = (data ?? []) as unknown as TaskListItem[];
   return { rows, total: count ?? 0, page, pageSize };
+}
+
+export type TaskDetail = TaskRow & {
+  project: { id: string; name: string; company_id: string } | null;
+  milestone: { id: string; code: string | null; title: string } | null;
+  assignee: { id: string; full_name: string } | null;
+  reviewer: { id: string; full_name: string } | null;
+  reporter: { id: string; full_name: string } | null;
+  checklist: TaskChecklistItemRow[];
+};
+
+export async function getTaskById(id: string): Promise<TaskDetail | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(
+      `
+      *,
+      project:projects!tasks_project_id_fkey ( id, name, company_id ),
+      milestone:milestones!tasks_milestone_id_fkey ( id, code, title ),
+      assignee:profiles!tasks_assignee_id_fkey ( id, full_name ),
+      reviewer:profiles!tasks_reviewer_id_fkey ( id, full_name ),
+      reporter:profiles!tasks_reporter_id_fkey ( id, full_name )
+      `,
+    )
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const { data: checklist, error: clErr } = await supabase
+    .from("task_checklist_items")
+    .select("*")
+    .eq("task_id", id)
+    .order("sort_order", { ascending: true });
+  if (clErr) throw new Error(clErr.message);
+
+  return {
+    ...(data as unknown as TaskRow),
+    project: (data as { project: TaskDetail["project"] }).project ?? null,
+    milestone: (data as { milestone: TaskDetail["milestone"] }).milestone ?? null,
+    assignee: (data as { assignee: TaskDetail["assignee"] }).assignee ?? null,
+    reviewer: (data as { reviewer: TaskDetail["reviewer"] }).reviewer ?? null,
+    reporter: (data as { reporter: TaskDetail["reporter"] }).reporter ?? null,
+    checklist: (checklist ?? []) as TaskChecklistItemRow[],
+  };
+}
+
+export type TaskCommentItem = TaskCommentRow & {
+  author: { id: string; full_name: string } | null;
+};
+
+export async function listTaskComments(
+  taskId: string,
+): Promise<TaskCommentItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("task_comments")
+    .select(
+      `
+      *,
+      author:profiles!task_comments_author_id_fkey ( id, full_name )
+      `,
+    )
+    .eq("task_id", taskId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown) as TaskCommentItem[];
 }
 
 export type TaskStats = {

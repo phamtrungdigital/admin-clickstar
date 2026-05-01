@@ -1,32 +1,36 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format, formatDistanceToNow } from "date-fns";
-import { vi } from "date-fns/locale";
+import { format } from "date-fns";
 import {
-  AlertCircle,
   ArrowRight,
   CalendarRange,
   Check,
   CheckCircle2,
   Clock,
-  Download,
-  FileText,
   Info,
-  MessageCircle,
+  ListChecks,
   ShieldCheck,
-  Ticket,
   User,
-  X,
+  Users,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
-import { getMockProject, type MockProject } from "@/lib/mock/projects";
+import { getProjectById, type ProjectDetail } from "@/lib/queries/projects";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Chi tiết dự án | Portal.Clickstar.vn" };
 
+const STATUS_LABEL: Record<string, string> = {
+  not_started: "Chưa bắt đầu",
+  active: "Đang thực hiện",
+  awaiting_customer: "Chờ phản hồi",
+  awaiting_review: "Chờ duyệt",
+  completed: "Hoàn thành",
+  paused: "Tạm dừng",
+};
+
 const MILESTONE_TONE: Record<
-  MockProject["milestones"][number]["status"],
+  string,
   { dot: string; pill: string; label: string }
 > = {
   completed: {
@@ -34,46 +38,49 @@ const MILESTONE_TONE: Record<
     pill: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     label: "Đã hoàn thành",
   },
-  in_progress: {
+  active: {
     dot: "bg-blue-500",
     pill: "bg-blue-50 text-blue-700 ring-blue-200",
     label: "Đang thực hiện",
   },
-  pending: {
+  awaiting_customer: {
+    dot: "bg-amber-500",
+    pill: "bg-amber-50 text-amber-700 ring-amber-200",
+    label: "Chờ phản hồi",
+  },
+  awaiting_review: {
+    dot: "bg-violet-500",
+    pill: "bg-violet-50 text-violet-700 ring-violet-200",
+    label: "Chờ duyệt",
+  },
+  paused: {
+    dot: "bg-rose-500",
+    pill: "bg-rose-50 text-rose-700 ring-rose-200",
+    label: "Tạm dừng",
+  },
+  not_started: {
     dot: "bg-slate-300",
     pill: "bg-slate-50 text-slate-600 ring-slate-200",
     label: "Sắp tới",
   },
 };
 
-const TICKET_LABEL: Record<MockProject["tickets"][number]["status"], string> = {
-  new: "Mới",
-  in_progress: "Đang xử lý",
-  awaiting_customer: "Chờ phản hồi",
-  resolved: "Đã giải quyết",
-};
-
-const TICKET_TONE: Record<MockProject["tickets"][number]["status"], string> = {
-  new: "bg-slate-50 text-slate-600 ring-slate-200",
-  in_progress: "bg-blue-50 text-blue-700 ring-blue-200",
-  awaiting_customer: "bg-amber-50 text-amber-700 ring-amber-200",
-  resolved: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-};
-
-export default async function CustomerProjectDetailPage({
+export default async function ProjectDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = getMockProject(id);
+  const project = await getProjectById(id).catch(() => null);
   if (!project) notFound();
+
+  const stats = computeStats(project);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={project.name}
-        description={`${project.service_label} · Hợp đồng ${project.contract_code}`}
+        description={`${project.contract?.name ?? "—"}${project.template ? ` · Template ${project.template.name} v${project.template.version}` : ""}`}
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
           { label: "Dự án", href: "/projects" },
@@ -81,100 +88,51 @@ export default async function CustomerProjectDetailPage({
         ]}
       />
 
-      <SnapshotBanner project={project} />
-
-      {project.pending_actions.length > 0 && (
-        <PendingActions actions={project.pending_actions} />
-      )}
+      <SnapshotBanner />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <ProgressOverview project={project} />
-          <MilestonesTimeline milestones={project.milestones} />
-          <DeliverablesList deliverables={project.deliverables} />
+          <ProgressOverview project={project} stats={stats} />
+          <MilestonesSection milestones={project.milestones} />
+          <TasksPreview tasks={project.tasks} />
         </div>
         <div className="space-y-6">
           <ProjectInfoCard project={project} />
-          <RecentTickets tickets={project.tickets} />
-          <ReportsList reports={project.reports} />
         </div>
       </div>
     </div>
   );
 }
 
-function SnapshotBanner({ project }: { project: MockProject }) {
+function computeStats(project: ProjectDetail) {
+  const total = project.milestones.length;
+  const done = project.milestones.filter((m) => m.status === "completed").length;
+  const doing = project.milestones.filter((m) => m.status === "active").length;
+  const pending = total - done - doing;
+  return { total, done, doing, pending };
+}
+
+function SnapshotBanner() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 px-5 py-3 text-sm">
       <div className="flex items-center gap-2 text-blue-900">
         <ShieldCheck className="h-4 w-4 flex-shrink-0 text-blue-600" />
         <span>
-          Dữ liệu hiển thị từ <strong>snapshot đã duyệt</strong>, cập nhật{" "}
-          {formatDistanceToNow(new Date(project.last_snapshot_at), {
-            locale: vi,
-            addSuffix: true,
-          })}
-          .
+          <strong>Phase 2</strong> sẽ thêm cơ chế snapshot — khách chỉ thấy
+          dữ liệu đã được duyệt. Hiện tại dữ liệu hiện trực tiếp từ DB.
         </span>
       </div>
-      <span className="text-xs text-blue-700">
-        {format(new Date(project.last_snapshot_at), "dd/MM/yyyy HH:mm")}
-      </span>
     </div>
   );
 }
 
-function PendingActions({
-  actions,
+function ProgressOverview({
+  project,
+  stats,
 }: {
-  actions: MockProject["pending_actions"];
+  project: ProjectDetail;
+  stats: ReturnType<typeof computeStats>;
 }) {
-  return (
-    <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <AlertCircle className="h-5 w-5 text-rose-600" />
-        <h3 className="text-sm font-semibold text-rose-900">
-          {actions.length} việc cần anh/chị xử lý
-        </h3>
-      </div>
-      <ul className="space-y-3">
-        {actions.map((action) => (
-          <li
-            key={action.id}
-            className="flex flex-col gap-2 rounded-lg border border-rose-200 bg-white px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
-          >
-            <div className="flex-1">
-              <p className="text-sm font-medium text-slate-900">
-                {action.label}
-              </p>
-              <p className="mt-1 text-xs text-slate-600">{action.description}</p>
-              {action.due_at && (
-                <p className="mt-1 inline-flex items-center gap-1 text-xs text-rose-700">
-                  <Clock className="h-3 w-3" />
-                  Hạn: {format(new Date(action.due_at), "dd/MM/yyyy")}
-                </p>
-              )}
-            </div>
-            <Link
-              href={action.href}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-700"
-            >
-              Xử lý ngay
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function ProgressOverview({ project }: { project: MockProject }) {
-  const total = project.milestones.length;
-  const done = project.milestones.filter((m) => m.status === "completed").length;
-  const doing = project.milestones.filter((m) => m.status === "in_progress").length;
-  const pending = total - done - doing;
-
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <h3 className="mb-4 text-sm font-semibold text-slate-900">
@@ -210,24 +168,16 @@ function ProgressOverview({ project }: { project: MockProject }) {
           </div>
         </div>
         <dl className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
-          <Stat label="Đã hoàn thành" value={done} dot="bg-emerald-500" />
-          <Stat label="Đang thực hiện" value={doing} dot="bg-blue-500" />
-          <Stat label="Sắp tới" value={pending} dot="bg-slate-300" />
+          <Stat label="Đã hoàn thành" value={stats.done} dot="bg-emerald-500" />
+          <Stat label="Đang thực hiện" value={stats.doing} dot="bg-blue-500" />
+          <Stat label="Sắp tới" value={stats.pending} dot="bg-slate-300" />
         </dl>
       </div>
     </section>
   );
 }
 
-function Stat({
-  label,
-  value,
-  dot,
-}: {
-  label: string;
-  value: number;
-  dot: string;
-}) {
+function Stat({ label, value, dot }: { label: string; value: number; dot: string }) {
   return (
     <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
       <dt className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -239,10 +189,10 @@ function Stat({
   );
 }
 
-function MilestonesTimeline({
+function MilestonesSection({
   milestones,
 }: {
-  milestones: MockProject["milestones"];
+  milestones: ProjectDetail["milestones"];
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
@@ -250,178 +200,191 @@ function MilestonesTimeline({
         <h3 className="text-sm font-semibold text-slate-900">
           Các giai đoạn (Milestones)
         </h3>
-        <span className="text-xs text-slate-500">
-          {milestones.length} giai đoạn
-        </span>
+        <span className="text-xs text-slate-500">{milestones.length} giai đoạn</span>
       </div>
-      <ol className="relative space-y-5 border-l border-slate-200 pl-6">
-        {milestones.map((m) => {
-          const tone = MILESTONE_TONE[m.status];
-          return (
-            <li key={m.id} className="relative">
-              <span
-                className={cn(
-                  "absolute -left-[31px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white",
-                  tone.dot,
-                )}
-              >
-                {m.status === "completed" && (
-                  <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                )}
-                {m.status === "in_progress" && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                )}
-              </span>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    <span className="mr-1.5 font-mono text-xs text-slate-500">
-                      {m.code}
-                    </span>
-                    {m.title}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {format(new Date(m.starts_at), "dd/MM")} —{" "}
-                    {format(new Date(m.ends_at), "dd/MM/yyyy")}
-                  </p>
-                </div>
+      {milestones.length === 0 ? (
+        <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+          Dự án này chưa có milestone nào.
+        </p>
+      ) : (
+        <ol className="relative space-y-5 border-l border-slate-200 pl-6">
+          {milestones.map((m) => {
+            const tone = MILESTONE_TONE[m.status] ?? MILESTONE_TONE.not_started;
+            return (
+              <li key={m.id} className="relative">
                 <span
                   className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
-                    tone.pill,
+                    "absolute -left-[31px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white",
+                    tone.dot,
                   )}
                 >
-                  {tone.label}
+                  {m.status === "completed" && (
+                    <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                  )}
                 </span>
-              </div>
-              {m.status === "in_progress" && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-blue-500"
-                      style={{ width: `${m.progress_percent}%` }}
-                    />
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {m.code && (
+                        <span className="mr-1.5 font-mono text-xs text-slate-500">
+                          {m.code}
+                        </span>
+                      )}
+                      {m.title}
+                    </p>
+                    {m.starts_at && m.ends_at && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {format(new Date(m.starts_at), "dd/MM")} —{" "}
+                        {format(new Date(m.ends_at), "dd/MM/yyyy")}
+                      </p>
+                    )}
                   </div>
-                  <span className="text-xs font-medium text-slate-600">
-                    {m.progress_percent}%
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+                      tone.pill,
+                    )}
+                  >
+                    {tone.label}
                   </span>
                 </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+                {m.status === "active" && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-blue-500"
+                        style={{ width: `${m.progress_percent}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">
+                      {m.progress_percent}%
+                    </span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
 
-function DeliverablesList({
-  deliverables,
-}: {
-  deliverables: MockProject["deliverables"];
-}) {
+function TasksPreview({ tasks }: { tasks: ProjectDetail["tasks"] }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-900">
-          Sản phẩm bàn giao
+          <ListChecks className="mr-1.5 inline h-4 w-4 text-blue-600" />
+          Tasks ({tasks.length})
         </h3>
-        <span className="text-xs text-slate-500">
-          {deliverables.length} mục
-        </span>
+        <Link
+          href="/tasks"
+          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+        >
+          Xem tất cả
+          <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
-      <ul className="space-y-3">
-        {deliverables.map((d) => (
-          <li
-            key={d.id}
-            id={`deliverable-${d.id}`}
-            className="flex flex-col gap-3 rounded-lg border border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-                <FileText className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900">
-                  {d.title}
+      {tasks.length === 0 ? (
+        <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+          Chưa có task nào trong dự án này.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {tasks.slice(0, 8).map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-slate-100 px-3 py-2"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {t.title}
                 </p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {d.filename} · Bàn giao {format(new Date(d.delivered_at), "dd/MM/yyyy")}{" "}
-                  bởi {d.delivered_by} · {d.milestone_code}
+                <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                  {t.due_at && (
+                    <>
+                      <Clock className="h-3 w-3" />
+                      {format(new Date(t.due_at), "dd/MM/yyyy")}
+                    </>
+                  )}
+                  {t.is_extra && (
+                    <span className="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
+                      Phát sinh
+                    </span>
+                  )}
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {d.status === "approved" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Đã duyệt
-                </span>
-              )}
-              {d.status === "rejected" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700 ring-1 ring-inset ring-rose-200">
-                  <X className="h-3 w-3" />
-                  Đã từ chối
-                </span>
-              )}
-              {d.status === "pending_approval" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-200">
-                  <Clock className="h-3 w-3" />
-                  Chờ duyệt
-                </span>
-              )}
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <Download className="h-3 w-3" />
-                Tải về
-              </button>
-              {d.status === "pending_approval" && (
-                <>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-                  >
-                    <Check className="h-3 w-3" />
-                    Duyệt
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
-                  >
-                    Từ chối
-                  </button>
-                </>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+              <TaskStatusBadge status={t.status} />
+            </li>
+          ))}
+          {tasks.length > 8 && (
+            <li className="text-center text-xs text-slate-500">
+              ... và {tasks.length - 8} task khác
+            </li>
+          )}
+        </ul>
+      )}
     </section>
   );
 }
 
-function ProjectInfoCard({ project }: { project: MockProject }) {
+function TaskStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { tone: string; label: string }> = {
+    todo: { tone: "bg-slate-100 text-slate-700 ring-slate-200", label: "Mới tạo" },
+    assigned: { tone: "bg-sky-50 text-sky-700 ring-sky-200", label: "Đã giao" },
+    in_progress: { tone: "bg-blue-50 text-blue-700 ring-blue-200", label: "Đang làm" },
+    blocked: { tone: "bg-rose-50 text-rose-700 ring-rose-200", label: "Bị chặn" },
+    awaiting_review: { tone: "bg-violet-50 text-violet-700 ring-violet-200", label: "Chờ duyệt" },
+    awaiting_customer: { tone: "bg-amber-50 text-amber-700 ring-amber-200", label: "Chờ khách" },
+    returned: { tone: "bg-orange-50 text-orange-700 ring-orange-200", label: "Trả về" },
+    done: { tone: "bg-emerald-50 text-emerald-700 ring-emerald-200", label: "Hoàn thành" },
+    cancelled: { tone: "bg-slate-100 text-slate-500 ring-slate-200", label: "Đã huỷ" },
+  };
+  const m = map[status] ?? map.todo;
+  return (
+    <span
+      className={cn(
+        "inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+        m.tone,
+      )}
+    >
+      {m.label}
+    </span>
+  );
+}
+
+function ProjectInfoCard({ project }: { project: ProjectDetail }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin dự án</h3>
       <dl className="space-y-3 text-sm">
+        <Row icon={Info} label="Trạng thái">
+          {STATUS_LABEL[project.status] ?? project.status}
+        </Row>
         <Row icon={CalendarRange} label="Thời gian">
-          {format(new Date(project.starts_at), "dd/MM/yyyy")} —{" "}
-          {format(new Date(project.ends_at), "dd/MM/yyyy")}
+          {project.starts_at && project.ends_at
+            ? `${format(new Date(project.starts_at), "dd/MM/yyyy")} — ${format(new Date(project.ends_at), "dd/MM/yyyy")}`
+            : "—"}
         </Row>
         <Row icon={User} label="PM phụ trách">
-          {project.pm_name}
+          {project.pm?.full_name ?? <span className="text-slate-400">Chưa gán</span>}
         </Row>
-        <Row icon={Info} label="Hợp đồng">
-          <Link
-            href="/contracts"
-            className="text-blue-700 hover:underline"
-          >
-            {project.contract_code}
-          </Link>
-        </Row>
+        {project.contract && (
+          <Row icon={Users} label="Hợp đồng">
+            <Link
+              href={`/contracts/${project.contract.id}`}
+              className="text-blue-700 hover:underline"
+            >
+              {project.contract.code ?? project.contract.name}
+            </Link>
+          </Row>
+        )}
+        {project.template && (
+          <Row icon={CheckCircle2} label="Template gốc">
+            {project.template.name} v{project.template.version}
+          </Row>
+        )}
       </dl>
     </section>
   );
@@ -446,97 +409,5 @@ function Row({
         <dd className="mt-0.5 text-sm text-slate-800">{children}</dd>
       </div>
     </div>
-  );
-}
-
-function RecentTickets({ tickets }: { tickets: MockProject["tickets"] }) {
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">
-          Ticket gần đây
-        </h3>
-        <Link
-          href="/tickets"
-          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-        >
-          Xem tất cả
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      </div>
-      {tickets.length === 0 ? (
-        <p className="text-sm text-slate-500">Chưa có ticket nào.</p>
-      ) : (
-        <ul className="space-y-2.5">
-          {tickets.slice(0, 5).map((t) => (
-            <li
-              key={t.id}
-              className="flex items-start gap-3 rounded-md hover:bg-slate-50 px-2 py-1.5 -mx-2"
-            >
-              <Ticket className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-slate-800">{t.title}</p>
-                <p className="mt-0.5 flex items-center gap-2 text-xs">
-                  <span className="font-mono text-slate-400">{t.code}</span>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-                      TICKET_TONE[t.status],
-                    )}
-                  >
-                    {TICKET_LABEL[t.status]}
-                  </span>
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <Link
-        href="/tickets/new"
-        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-      >
-        <MessageCircle className="h-3.5 w-3.5" />
-        Gửi yêu cầu mới
-      </Link>
-    </section>
-  );
-}
-
-function ReportsList({ reports }: { reports: MockProject["reports"] }) {
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5">
-      <h3 className="mb-3 text-sm font-semibold text-slate-900">
-        Báo cáo định kỳ
-      </h3>
-      {reports.length === 0 ? (
-        <p className="text-sm text-slate-500">Chưa có báo cáo nào.</p>
-      ) : (
-        <ul className="space-y-2">
-          {reports.map((r) => (
-            <li
-              key={r.id}
-              className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-slate-50"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-800">
-                  {r.period_label}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Phát hành {format(new Date(r.published_at), "dd/MM/yyyy")}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700 hover:bg-slate-50"
-              >
-                <Download className="h-3 w-3" />
-                Tải về
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }

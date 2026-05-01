@@ -26,8 +26,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getContractById } from "@/lib/queries/contracts";
+import { listProjectsForContract } from "@/lib/queries/projects";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
+import { createClient } from "@/lib/supabase/server";
+import { ForkTemplateButton } from "@/components/projects/fork-template-button";
+import type { TemplateOption, StaffOption } from "@/components/projects/fork-template-button";
 
 export const metadata = { title: "Chi tiết hợp đồng | Portal.Clickstar.vn" };
 
@@ -41,6 +45,33 @@ export default async function ContractDetailPage({
   const canManage = isInternal(profile);
   const contract = await getContractById(id).catch(() => null);
   if (!contract) notFound();
+
+  const projects = canManage
+    ? await listProjectsForContract(contract.id).catch(() => [])
+    : [];
+
+  let templates: TemplateOption[] = [];
+  let staff: StaffOption[] = [];
+  if (canManage) {
+    const supabase = await createClient();
+    const [{ data: tplRows }, { data: staffRows }] = await Promise.all([
+      supabase
+        .from("service_templates")
+        .select("id, name, industry, duration_days, version")
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .order("name"),
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("audience", "internal")
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .order("full_name"),
+    ]);
+    templates = (tplRows ?? []) as TemplateOption[];
+    staff = (staffRows ?? []) as StaffOption[];
+  }
 
   return (
     <div className="space-y-6">
@@ -62,6 +93,14 @@ export default async function ContractDetailPage({
             >
               Quay lại
             </Link>
+            {canManage && (
+              <ForkTemplateButton
+                contractId={contract.id}
+                contractName={contract.code ?? contract.name}
+                templates={templates}
+                staff={staff}
+              />
+            )}
             {canManage && (
               <Link
                 href={`/contracts/${contract.id}/edit`}
@@ -92,12 +131,22 @@ export default async function ContractDetailPage({
           <Tabs defaultValue="info" className="w-full">
             <TabsList className="bg-white border border-slate-200 p-1">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
+              {canManage && (
+                <TabsTrigger value="projects">
+                  Dự án ({projects.length})
+                </TabsTrigger>
+              )}
               <TabsTrigger value="services">Dịch vụ</TabsTrigger>
               <TabsTrigger value="attachment">Tệp đính kèm</TabsTrigger>
             </TabsList>
             <TabsContent value="info" className="mt-4">
               <InfoCard contract={contract} />
             </TabsContent>
+            {canManage && (
+              <TabsContent value="projects" className="mt-4">
+                <ProjectsTab projects={projects} />
+              </TabsContent>
+            )}
             <TabsContent value="services" className="mt-4">
               <ServicesTab
                 services={contract.services}
@@ -249,6 +298,84 @@ function ServicesTab({
               </TableCell>
               <TableCell className="text-sm text-slate-600">
                 {s.notes ?? <span className="text-slate-400">—</span>}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function ProjectsTab({
+  projects,
+}: {
+  projects: Awaited<ReturnType<typeof listProjectsForContract>>;
+}) {
+  if (projects.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
+        <FolderOpen className="mx-auto h-10 w-10 text-slate-300" />
+        <h3 className="mt-3 text-base font-semibold text-slate-900">
+          Chưa có dự án
+        </h3>
+        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+          Bấm <strong>"Tạo dự án từ template"</strong> ở góc trên để fork
+          template thành dự án đầu tiên cho hợp đồng này.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Dự án</TableHead>
+            <TableHead>Template</TableHead>
+            <TableHead>PM</TableHead>
+            <TableHead>Tiến độ</TableHead>
+            <TableHead className="text-right">Milestones</TableHead>
+            <TableHead className="text-right">Tasks</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {projects.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="font-medium text-slate-900 hover:text-blue-700"
+                >
+                  {p.name}
+                </Link>
+              </TableCell>
+              <TableCell className="text-sm text-slate-600">
+                {p.template
+                  ? `${p.template.name} v${p.template.version}`
+                  : <span className="text-slate-400">—</span>}
+              </TableCell>
+              <TableCell className="text-sm text-slate-700">
+                {p.pm?.full_name ?? <span className="text-slate-400">—</span>}
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${p.progress_percent}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-slate-600">
+                    {p.progress_percent}%
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right text-sm text-slate-700">
+                {p.milestone_count}
+              </TableCell>
+              <TableCell className="text-right text-sm text-slate-700">
+                {p.task_count}
               </TableCell>
             </TableRow>
           ))}

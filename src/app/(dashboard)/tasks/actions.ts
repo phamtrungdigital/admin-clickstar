@@ -6,6 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { requireInternalAction } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
 import {
+  notifyTaskApproved,
+  notifyTaskAssigned,
+  notifyTaskBlocked,
+  notifyTaskReturned,
+  notifyTaskSubmittedForReview,
+} from "@/lib/notifications/tasks";
+import {
   addTaskCommentSchema,
   awaitingCustomerSchema,
   blockTaskSchema,
@@ -108,6 +115,22 @@ export async function createTaskAction(
       is_extra: parsed.data.is_extra,
     },
   });
+
+  if (parsed.data.assignee_id) {
+    await notifyTaskAssigned(
+      {
+        taskId: task.id,
+        taskTitle: parsed.data.title,
+        projectId: parsed.data.project_id,
+        projectName: null, // skipped lookup; assignee will see project on page
+        companyId: project.company_id as string,
+        assigneeId: parsed.data.assignee_id,
+        reviewerId: parsed.data.reviewer_id,
+        reporterId: user.id,
+      },
+      user.id,
+    );
+  }
 
   revalidatePath("/tasks");
   revalidatePath(`/projects/${parsed.data.project_id}`);
@@ -319,10 +342,75 @@ export async function assignTaskAction(
     },
   });
 
+  // Look up task title + project name for notification body
+  const { data: detail } = await supabase
+    .from("tasks")
+    .select(
+      "title, project:projects!tasks_project_id_fkey ( id, name )",
+    )
+    .eq("id", taskId)
+    .maybeSingle();
+  const projectInfo = (detail as { project: { id: string; name: string } | null } | null)
+    ?.project ?? null;
+  await notifyTaskAssigned(
+    {
+      taskId,
+      taskTitle: (detail?.title as string) ?? "Task",
+      projectId: task.project_id as string | null,
+      projectName: projectInfo?.name ?? null,
+      companyId: task.company_id as string,
+      assigneeId,
+      reviewerId,
+      reporterId: user.id,
+    },
+    user.id,
+  );
+
   revalidatePath("/tasks");
   revalidatePath(`/tasks/${taskId}`);
   if (task.project_id) revalidatePath(`/projects/${task.project_id as string}`);
   return { ok: true };
+}
+
+/**
+ * Build a TaskNotificationContext from a task id by reading current task
+ * + parents. Returns null if the task or project disappeared in between.
+ */
+async function loadTaskNotificationContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  taskId: string,
+) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(
+      `
+      id, title, assignee_id, reviewer_id, reporter_id, company_id, project_id,
+      project:projects!tasks_project_id_fkey ( id, name )
+      `,
+    )
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const r = data as unknown as {
+    id: string;
+    title: string;
+    assignee_id: string | null;
+    reviewer_id: string | null;
+    reporter_id: string | null;
+    company_id: string;
+    project_id: string | null;
+    project: { id: string; name: string } | null;
+  };
+  return {
+    taskId: r.id,
+    taskTitle: r.title,
+    projectId: r.project_id,
+    projectName: r.project?.name ?? null,
+    companyId: r.company_id,
+    assigneeId: r.assignee_id,
+    reviewerId: r.reviewer_id,
+    reporterId: r.reporter_id,
+  };
 }
 
 export async function startTaskAction(taskId: string): Promise<TaskActionResult> {
@@ -340,7 +428,7 @@ export async function startTaskAction(taskId: string): Promise<TaskActionResult>
 export async function submitForReviewAction(
   taskId: string,
 ): Promise<TaskActionResult> {
-  return executeTransition(
+  const result = await executeTransition(
     taskId,
     {
       expectedFrom: ["in_progress"],
@@ -349,12 +437,21 @@ export async function submitForReviewAction(
     },
     { action: "submit" },
   );
+  if (result.ok) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const ctx = await loadTaskNotificationContext(supabase, taskId);
+    if (ctx && user) await notifyTaskSubmittedForReview(ctx, user.id);
+  }
+  return result;
 }
 
 export async function approveTaskAction(
   taskId: string,
 ): Promise<TaskActionResult> {
-  return executeTransition(
+  const result = await executeTransition(
     taskId,
     {
       expectedFrom: ["awaiting_review"],
@@ -363,6 +460,15 @@ export async function approveTaskAction(
     },
     { action: "approve" },
   );
+  if (result.ok) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const ctx = await loadTaskNotificationContext(supabase, taskId);
+    if (ctx && user) await notifyTaskApproved(ctx, user.id);
+  }
+  return result;
 }
 
 export async function returnTaskAction(
@@ -391,7 +497,7 @@ export async function returnTaskAction(
       is_internal: true,
     });
   }
-  return executeTransition(
+  const result = await executeTransition(
     taskId,
     {
       expectedFrom: ["awaiting_review"],
@@ -400,6 +506,15 @@ export async function returnTaskAction(
     },
     { action: "return", reason: parsed.data.reason },
   );
+  if (result.ok) {
+    const sb = await createClient();
+    const {
+      data: { user: u },
+    } = await sb.auth.getUser();
+    const ctx = await loadTaskNotificationContext(sb, taskId);
+    if (ctx && u) await notifyTaskReturned(ctx, u.id, parsed.data.reason);
+  }
+  return result;
 }
 
 export async function blockTaskAction(
@@ -426,7 +541,7 @@ export async function blockTaskAction(
       is_internal: true,
     });
   }
-  return executeTransition(
+  const result = await executeTransition(
     taskId,
     {
       expectedFrom: ["assigned", "in_progress", "returned"],
@@ -435,6 +550,15 @@ export async function blockTaskAction(
     },
     { action: "block", reason: parsed.data.reason },
   );
+  if (result.ok) {
+    const sb = await createClient();
+    const {
+      data: { user: u },
+    } = await sb.auth.getUser();
+    const ctx = await loadTaskNotificationContext(sb, taskId);
+    if (ctx && u) await notifyTaskBlocked(ctx, u.id, parsed.data.reason);
+  }
+  return result;
 }
 
 export async function unblockTaskAction(

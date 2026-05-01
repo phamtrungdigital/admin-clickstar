@@ -8,10 +8,12 @@ import {
   Flame,
   Inbox,
   ListChecks,
+  Plus,
   Search,
   Sparkles,
 } from "lucide-react";
 
+import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Pagination } from "@/components/customers/pagination";
@@ -148,6 +150,19 @@ export default async function TasksPage({
           { label: "Trang chủ", href: "/dashboard" },
           { label: "Công việc" },
         ]}
+        actions={
+          canViewAll ? (
+            <Link
+              href="/tasks/new"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Tạo task
+            </Link>
+          ) : null
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

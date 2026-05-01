@@ -8,6 +8,7 @@ import {
   Eye,
   EyeOff,
   Folder,
+  Pencil,
   Sparkles,
   User,
 } from "lucide-react";
@@ -91,15 +92,28 @@ export default async function TaskDetailPage({
           { label: task.title },
         ]}
         actions={
-          <Link
-            href={task.project ? `/projects/${task.project.id}` : "/tasks"}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "lg" }),
-              "px-4",
+          <>
+            <Link
+              href={task.project ? `/projects/${task.project.id}` : "/tasks"}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "px-4",
+              )}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" /> Quay lại
+            </Link>
+            {internal && (
+              <Link
+                href={`/tasks/${task.id}/edit`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "lg" }),
+                  "px-4",
+                )}
+              >
+                <Pencil className="mr-2 h-4 w-4" /> Sửa
+              </Link>
             )}
-          >
-            <ChevronLeft className="mr-1 h-4 w-4" /> Quay lại
-          </Link>
+          </>
         }
       />
 

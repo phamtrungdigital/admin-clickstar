@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
@@ -81,14 +82,21 @@ export function MobileSidebarDrawer({
     if (open) setOpen(false);
   }
 
-  return (
+  // Portal to <body> so the drawer + backdrop fully escape any sticky /
+  // transformed / overflow-hidden parent stacking context. Without this the
+  // backdrop was getting clipped by the dashboard's flex container on some
+  // mobile browsers, leaving the page content visible to the right of the
+  // drawer.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
         aria-hidden
         onClick={() => setOpen(false)}
         className={cn(
-          "fixed inset-0 z-40 bg-slate-900/50 transition-opacity duration-200 lg:hidden",
+          "fixed inset-0 z-[60] bg-slate-900/50 transition-opacity duration-200 lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
@@ -99,7 +107,7 @@ export function MobileSidebarDrawer({
         aria-modal="true"
         aria-label="Điều hướng"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-200 ease-out lg:hidden",
+          "fixed inset-y-0 left-0 z-[70] flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-200 ease-out lg:hidden",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -117,6 +125,7 @@ export function MobileSidebarDrawer({
           onNavigate={() => setOpen(false)}
         />
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

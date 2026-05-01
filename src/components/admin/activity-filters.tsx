@@ -32,6 +32,7 @@ const ENTITY_OPTIONS = [
   { value: "task", label: "Công việc" },
   { value: "ticket", label: "Ticket" },
   { value: "role_permission", label: "Phân quyền" },
+  { value: "system_settings", label: "Cài đặt hệ thống" },
 ];
 
 export function ActivityFilters() {

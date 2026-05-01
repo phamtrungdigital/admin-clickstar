@@ -22,7 +22,8 @@ export type AuditEntityType =
   | "task"
   | "ticket"
   | "document"
-  | "role_permission";
+  | "role_permission"
+  | "system_settings";
 
 export type AuditInput = {
   user_id: string | null;

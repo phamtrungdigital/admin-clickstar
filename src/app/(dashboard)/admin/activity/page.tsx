@@ -65,6 +65,7 @@ const ENTITY_META: Record<
   company: { label: "Khách hàng", icon: Building2 },
   contract: { label: "Hợp đồng", icon: FileSignature },
   role_permission: { label: "Phân quyền", icon: ShieldUser },
+  system_settings: { label: "Cài đặt hệ thống", icon: ShieldUser },
 };
 
 export default async function ActivityPage({
@@ -219,6 +220,14 @@ function describeChange(row: AuditListItem): string | null {
     const oldLevel = oldVal?.level as string | undefined;
     if (role && scope) {
       return `Đổi quyền ${role} × ${scope}: ${oldLevel ?? "—"} → ${newLevel ?? "—"}`;
+    }
+  }
+  if (row.entity_type === "system_settings" && row.action === "update") {
+    const k = newVal?.key as string | undefined;
+    const oldV = oldVal?.value;
+    const newV = newVal?.value;
+    if (k) {
+      return `Đổi cài đặt ${k}: ${JSON.stringify(oldV)} → ${JSON.stringify(newV)}`;
     }
   }
   if (row.entity_type === "profile") {

@@ -15,6 +15,7 @@ import {
   Settings,
   Bell,
   FolderKanban,
+  ListTree,
 } from "lucide-react";
 import type { InternalRole } from "@/lib/database.types";
 
@@ -33,6 +34,7 @@ export const internalNav: NavItem[] = [
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
   { label: "Dự án", href: "/projects", icon: FolderKanban },
   { label: "Dịch vụ", href: "/services", icon: Package },
+  { label: "Template", href: "/templates", icon: ListTree },
   {
     label: "Vận hành",
     href: "/tasks",

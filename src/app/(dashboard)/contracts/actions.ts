@@ -30,8 +30,6 @@ function flattenZodErrors(error: import("zod").ZodError): Record<string, string>
 function normalizeServiceLine(line: ContractServiceLineInput) {
   return {
     service_id: line.service_id,
-    unit_price: line.unit_price,
-    quantity: line.quantity,
     starts_at: line.starts_at?.length ? line.starts_at : null,
     ends_at: line.ends_at?.length ? line.ends_at : null,
     notes: line.notes?.length ? line.notes : null,
@@ -96,7 +94,6 @@ export async function createContractAction(
       name: payload.name,
       code: payload.code,
       status: payload.status,
-      total_value: payload.total_value,
     },
   });
 

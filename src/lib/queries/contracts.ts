@@ -90,14 +90,13 @@ export type ContractStats = {
   active: number;
   draft: number;
   completed: number;
-  total_value: number;
 };
 
 export async function getContractStats(): Promise<ContractStats> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("contracts")
-    .select("status, total_value")
+    .select("status")
     .is("deleted_at", null);
   if (error) throw new Error(error.message);
 
@@ -106,11 +105,9 @@ export async function getContractStats(): Promise<ContractStats> {
     active: 0,
     draft: 0,
     completed: 0,
-    total_value: 0,
   };
   for (const row of data ?? []) {
     stats.total += 1;
-    stats.total_value += Number(row.total_value ?? 0);
     if (row.status === "active") stats.active += 1;
     else if (row.status === "draft") stats.draft += 1;
     else if (row.status === "completed") stats.completed += 1;

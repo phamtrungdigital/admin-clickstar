@@ -27,8 +27,6 @@ export default async function EditContractPage({
 
   const serviceLines: ContractServiceLineInput[] = contract.services.map((s) => ({
     service_id: s.service_id,
-    unit_price: Number(s.unit_price),
-    quantity: Number(s.quantity),
     starts_at: s.starts_at ?? "",
     ends_at: s.ends_at ?? "",
     notes: s.notes ?? "",
@@ -55,9 +53,6 @@ export default async function EditContractPage({
           code: contract.code ?? "",
           company_id: contract.company_id,
           status: contract.status,
-          total_value: Number(contract.total_value),
-          currency: contract.currency,
-          vat_percent: Number(contract.vat_percent),
           signed_at: contract.signed_at ?? "",
           starts_at: contract.starts_at ?? "",
           ends_at: contract.ends_at ?? "",

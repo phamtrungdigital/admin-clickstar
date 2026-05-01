@@ -32,18 +32,11 @@ export function ContractServicesEditor({
     return map;
   }, [options]);
 
-  const total = useMemo(
-    () => services.reduce((sum, s) => sum + s.unit_price * s.quantity, 0),
-    [services],
-  );
-
   const addRow = () => {
     onChange([
       ...services,
       {
         service_id: "",
-        unit_price: 0,
-        quantity: 1,
         starts_at: "",
         ends_at: "",
         notes: "",
@@ -70,160 +63,102 @@ export function ContractServicesEditor({
       )}
 
       <div className="space-y-3">
-        {services.map((line, idx) => {
-          const subtotal = line.unit_price * line.quantity;
-          return (
-            <div
-              key={idx}
-              className="rounded-lg border border-slate-200 bg-white p-4"
-            >
-              <div className="grid gap-3 md:grid-cols-12">
-                <div className="md:col-span-5">
-                  <Label className="text-xs font-medium text-slate-500">
-                    Dịch vụ
-                  </Label>
-                  <Select
-                    value={line.service_id || undefined}
-                    onValueChange={(v) => {
-                      if (!v) return;
-                      updateRow(idx, { service_id: v });
-                    }}
-                  >
-                    <SelectTrigger className="mt-1 w-full">
-                      <SelectValue placeholder="Chọn dịch vụ">
-                        {(value: string | null) => {
-                          if (!value) return null;
-                          const o = optionsById.get(value);
-                          if (!o) return value;
-                          return o.category ? `${o.name} · ${o.category}` : o.name;
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {options.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.name}
-                          {o.category ? ` · ${o.category}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="md:col-span-3">
-                  <Label className="text-xs font-medium text-slate-500">
-                    Đơn giá (VND)
-                  </Label>
-                  <Input
-                    className="mt-1"
-                    type="number"
-                    inputMode="numeric"
-                    step="1000"
-                    min={0}
-                    value={line.unit_price}
-                    onChange={(e) =>
-                      updateRow(idx, {
-                        unit_price: e.target.valueAsNumber || 0,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <Label className="text-xs font-medium text-slate-500">
-                    Số lượng
-                  </Label>
-                  <Input
-                    className="mt-1"
-                    type="number"
-                    inputMode="numeric"
-                    step="1"
-                    min={1}
-                    value={line.quantity}
-                    onChange={(e) =>
-                      updateRow(idx, {
-                        quantity: e.target.valueAsNumber || 1,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="md:col-span-2 flex items-end justify-between gap-2">
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">Thành tiền</p>
-                    <p className="font-semibold text-slate-900">
-                      {subtotal.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeRow(idx)}
-                    aria-label="Xoá dòng"
-                    className={cn(
-                      "inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-slate-500",
-                      "hover:bg-rose-50 hover:text-rose-600",
-                    )}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+        {services.map((line, idx) => (
+          <div
+            key={idx}
+            className="rounded-lg border border-slate-200 bg-white p-4"
+          >
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label className="text-xs font-medium text-slate-500">
+                  Dịch vụ
+                </Label>
+                <Select
+                  value={line.service_id || undefined}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    updateRow(idx, { service_id: v });
+                  }}
+                >
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Chọn dịch vụ">
+                      {(value: string | null) => {
+                        if (!value) return null;
+                        const o = optionsById.get(value);
+                        if (!o) return value;
+                        return o.category ? `${o.name} · ${o.category}` : o.name;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.name}
+                        {o.category ? ` · ${o.category}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+              <button
+                type="button"
+                onClick={() => removeRow(idx)}
+                aria-label="Xoá dòng"
+                className={cn(
+                  "inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-500",
+                  "hover:bg-rose-50 hover:text-rose-600",
+                )}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
 
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <div>
-                  <Label className="text-xs font-medium text-slate-500">
-                    Bắt đầu
-                  </Label>
-                  <Input
-                    className="mt-1"
-                    type="date"
-                    value={line.starts_at}
-                    onChange={(e) =>
-                      updateRow(idx, { starts_at: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium text-slate-500">
-                    Kết thúc
-                  </Label>
-                  <Input
-                    className="mt-1"
-                    type="date"
-                    value={line.ends_at}
-                    onChange={(e) =>
-                      updateRow(idx, { ends_at: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium text-slate-500">
-                    Ghi chú
-                  </Label>
-                  <Input
-                    className="mt-1"
-                    value={line.notes}
-                    onChange={(e) => updateRow(idx, { notes: e.target.value })}
-                    placeholder="Ghi chú riêng cho dịch vụ này"
-                  />
-                </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <div>
+                <Label className="text-xs font-medium text-slate-500">
+                  Bắt đầu
+                </Label>
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={line.starts_at}
+                  onChange={(e) =>
+                    updateRow(idx, { starts_at: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-slate-500">
+                  Kết thúc
+                </Label>
+                <Input
+                  className="mt-1"
+                  type="date"
+                  value={line.ends_at}
+                  onChange={(e) =>
+                    updateRow(idx, { ends_at: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-slate-500">
+                  Ghi chú
+                </Label>
+                <Input
+                  className="mt-1"
+                  value={line.notes}
+                  onChange={(e) => updateRow(idx, { notes: e.target.value })}
+                  placeholder="Ghi chú riêng cho dịch vụ này"
+                />
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <Button type="button" variant="outline" onClick={addRow}>
-          <Plus className="mr-2 h-4 w-4" /> Thêm dịch vụ
-        </Button>
-        <p className="text-sm text-slate-600">
-          Tổng tạm tính:{" "}
-          <span className="font-semibold text-slate-900">
-            {total.toLocaleString("vi-VN")} ₫
-          </span>
-        </p>
-      </div>
+      <Button type="button" variant="outline" onClick={addRow}>
+        <Plus className="mr-2 h-4 w-4" /> Thêm dịch vụ
+      </Button>
     </div>
   );
 }

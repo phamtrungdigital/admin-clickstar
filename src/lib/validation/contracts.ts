@@ -11,13 +11,12 @@ const CONTRACT_STATUS = [
 ] as const;
 
 /**
- * One service line in a contract. unit_price + quantity always present so
- * the form can render a totals row without dealing with optionals.
+ * One service line in a contract. Pricing fields (unit_price/quantity) live
+ * in the DB with safe defaults but are intentionally not collected in the
+ * form — cost control is a separate, future feature.
  */
 export const contractServiceLineSchema = z.object({
   service_id: z.string().uuid("Chọn dịch vụ"),
-  unit_price: z.number().min(0).max(99_999_999_999),
-  quantity: z.number().min(0.01).max(1_000_000),
   starts_at: trimmed.max(20),
   ends_at: trimmed.max(20),
   notes: trimmed.max(500),
@@ -35,9 +34,6 @@ export const createContractSchema = z.object({
   code: trimmed.max(255),
   company_id: z.string().uuid("Chọn khách hàng"),
   status: z.enum(CONTRACT_STATUS),
-  total_value: z.number().min(0).max(999_999_999_999.99),
-  currency: trimmed.max(8),
-  vat_percent: z.number().min(0).max(100),
   signed_at: trimmed.max(20),
   starts_at: trimmed.max(20),
   ends_at: trimmed.max(20),
@@ -84,9 +80,6 @@ export function normalizeContractInput<T extends Partial<CreateContractInput>>(
       const v = out[key];
       out[key] = typeof v === "string" && v.length > 0 ? v : null;
     }
-  }
-  if (typeof out.currency !== "string" || !out.currency) {
-    out.currency = "VND";
   }
   return out as Omit<T, "services">;
 }

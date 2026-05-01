@@ -55,7 +55,6 @@ export function ContractForm({
     handleSubmit,
     control,
     setError,
-    setValue,
     formState: { errors },
   } = useForm<CreateContractInput>({
     resolver: zodResolver(createContractSchema),
@@ -64,9 +63,6 @@ export function ContractForm({
       code: defaultValues?.code ?? "",
       company_id: defaultValues?.company_id ?? "",
       status: defaultValues?.status ?? "draft",
-      total_value: defaultValues?.total_value ?? 0,
-      currency: defaultValues?.currency ?? "VND",
-      vat_percent: defaultValues?.vat_percent ?? 8,
       signed_at: defaultValues?.signed_at ?? "",
       starts_at: defaultValues?.starts_at ?? "",
       ends_at: defaultValues?.ends_at ?? "",
@@ -78,12 +74,6 @@ export function ContractForm({
   });
 
   const companyId = useWatch({ control, name: "company_id" });
-  const servicesValue = useWatch({ control, name: "services" });
-
-  const computedTotal = (servicesValue ?? []).reduce(
-    (sum, s) => sum + (s.unit_price || 0) * (s.quantity || 0),
-    0,
-  );
 
   const onSubmit = (values: CreateContractInput) => {
     startTransition(async () => {
@@ -219,64 +209,6 @@ export function ContractForm({
             />
           )}
         />
-      </FormSection>
-
-      <FormSection
-        title="Giá trị & VAT"
-        description="Có thể đồng bộ tổng giá trị từ tổng tạm tính của các dịch vụ ở trên."
-      >
-        <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Tổng giá trị (VND)" error={errors.total_value?.message}>
-            <Controller
-              control={control}
-              name="total_value"
-              render={({ field }) => (
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  step="1000"
-                  min={0}
-                  value={field.value}
-                  onChange={(e) =>
-                    field.onChange(e.target.valueAsNumber || 0)
-                  }
-                  onBlur={field.onBlur}
-                />
-              )}
-            />
-            {computedTotal > 0 && (
-              <button
-                type="button"
-                onClick={() => setValue("total_value", computedTotal)}
-                className="text-[11px] text-blue-600 hover:underline"
-              >
-                Lấy từ dịch vụ ({computedTotal.toLocaleString("vi-VN")} ₫)
-              </button>
-            )}
-          </Field>
-          <Field label="VAT (%)" error={errors.vat_percent?.message}>
-            <Controller
-              control={control}
-              name="vat_percent"
-              render={({ field }) => (
-                <Input
-                  type="number"
-                  step="0.1"
-                  min={0}
-                  max={100}
-                  value={field.value}
-                  onChange={(e) =>
-                    field.onChange(e.target.valueAsNumber || 0)
-                  }
-                  onBlur={field.onBlur}
-                />
-              )}
-            />
-          </Field>
-          <Field label="Đơn vị tiền tệ" error={errors.currency?.message}>
-            <Input {...register("currency")} placeholder="VND" />
-          </Field>
-        </div>
       </FormSection>
 
       <FormSection

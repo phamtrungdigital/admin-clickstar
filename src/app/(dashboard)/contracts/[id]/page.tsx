@@ -9,7 +9,6 @@ import {
   FileSignature,
   FolderOpen,
   Pencil,
-  Wallet,
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -42,13 +41,6 @@ export default async function ContractDetailPage({
   const canManage = isInternal(profile);
   const contract = await getContractById(id).catch(() => null);
   if (!contract) notFound();
-
-  const servicesTotal = contract.services.reduce(
-    (sum, s) => sum + Number(s.unit_price) * Number(s.quantity),
-    0,
-  );
-  const vatAmount = (Number(contract.total_value) * Number(contract.vat_percent)) / 100;
-  const grandTotal = Number(contract.total_value) + vatAmount;
 
   return (
     <div className="space-y-6">
@@ -109,7 +101,6 @@ export default async function ContractDetailPage({
             <TabsContent value="services" className="mt-4">
               <ServicesTab
                 services={contract.services}
-                servicesTotal={servicesTotal}
                 canManage={canManage}
               />
             </TabsContent>
@@ -124,12 +115,7 @@ export default async function ContractDetailPage({
           </Tabs>
         </div>
 
-        <SidePanel
-          contract={contract}
-          servicesTotal={servicesTotal}
-          vatAmount={vatAmount}
-          grandTotal={grandTotal}
-        />
+        <SidePanel contract={contract} />
       </div>
     </div>
   );
@@ -191,11 +177,6 @@ function InfoCard({
               : <Empty />
           }
         />
-        <Row
-          icon={Wallet}
-          label="VAT"
-          value={`${Number(contract.vat_percent)}%`}
-        />
         {contract.notes && (
           <div className="md:col-span-2 mt-2">
             <dt className="text-xs font-medium text-slate-500">Ghi chú</dt>
@@ -211,11 +192,9 @@ function InfoCard({
 
 function ServicesTab({
   services,
-  servicesTotal,
   canManage,
 }: {
   services: NonNullable<Awaited<ReturnType<typeof getContractById>>>["services"];
-  servicesTotal: number;
   canManage: boolean;
 }) {
   if (services.length === 0) {
@@ -240,9 +219,9 @@ function ServicesTab({
         <TableHeader>
           <TableRow>
             <TableHead>Dịch vụ</TableHead>
-            <TableHead className="text-right">Đơn giá</TableHead>
-            <TableHead className="text-right">Số lượng</TableHead>
-            <TableHead className="text-right">Thành tiền</TableHead>
+            <TableHead>Bắt đầu</TableHead>
+            <TableHead>Kết thúc</TableHead>
+            <TableHead>Ghi chú</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -258,25 +237,21 @@ function ServicesTab({
                   )}
                 </div>
               </TableCell>
-              <TableCell className="text-right text-sm text-slate-700">
-                {Number(s.unit_price).toLocaleString("vi-VN")}
+              <TableCell className="text-sm text-slate-600">
+                {s.starts_at
+                  ? format(new Date(s.starts_at), "dd/MM/yyyy")
+                  : <span className="text-slate-400">—</span>}
               </TableCell>
-              <TableCell className="text-right text-sm text-slate-700">
-                {Number(s.quantity).toLocaleString("vi-VN")}
+              <TableCell className="text-sm text-slate-600">
+                {s.ends_at
+                  ? format(new Date(s.ends_at), "dd/MM/yyyy")
+                  : <span className="text-slate-400">—</span>}
               </TableCell>
-              <TableCell className="text-right font-medium text-slate-900">
-                {(Number(s.unit_price) * Number(s.quantity)).toLocaleString("vi-VN")}
+              <TableCell className="text-sm text-slate-600">
+                {s.notes ?? <span className="text-slate-400">—</span>}
               </TableCell>
             </TableRow>
           ))}
-          <TableRow className="bg-slate-50">
-            <TableCell colSpan={3} className="text-right text-sm font-medium text-slate-700">
-              Tổng tạm tính dịch vụ
-            </TableCell>
-            <TableCell className="text-right font-semibold text-slate-900">
-              {servicesTotal.toLocaleString("vi-VN")} ₫
-            </TableCell>
-          </TableRow>
         </TableBody>
       </Table>
     </div>
@@ -322,34 +297,11 @@ function AttachmentTab({
 
 function SidePanel({
   contract,
-  servicesTotal,
-  vatAmount,
-  grandTotal,
 }: {
   contract: NonNullable<Awaited<ReturnType<typeof getContractById>>>;
-  servicesTotal: number;
-  vatAmount: number;
-  grandTotal: number;
 }) {
   return (
     <div className="space-y-4">
-      <SidePanelCard title="Tổng quan giá trị">
-        <dl className="space-y-2.5 text-sm">
-          <Money label="Giá trị hợp đồng" value={Number(contract.total_value)} />
-          <Money
-            label={`VAT (${Number(contract.vat_percent)}%)`}
-            value={vatAmount}
-          />
-          <div className="flex items-center justify-between border-t border-slate-200 pt-2.5">
-            <dt className="font-semibold text-slate-900">Tổng cộng</dt>
-            <dd className="font-semibold text-blue-700">
-              {grandTotal.toLocaleString("vi-VN")} ₫
-            </dd>
-          </div>
-          <Money label="Tổng tạm tính dịch vụ" value={servicesTotal} muted />
-        </dl>
-      </SidePanelCard>
-
       <SidePanelCard title="Lịch sử">
         <dl className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
@@ -366,25 +318,6 @@ function SidePanel({
           </div>
         </dl>
       </SidePanelCard>
-    </div>
-  );
-}
-
-function Money({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: number;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className={cn("text-slate-500", muted && "text-slate-400")}>{label}</dt>
-      <dd className={cn("font-medium text-slate-800", muted && "text-slate-500")}>
-        {value.toLocaleString("vi-VN")} ₫
-      </dd>
     </div>
   );
 }

@@ -6,7 +6,6 @@ import {
   CircleDashed,
   FileSignature,
   Plus,
-  Wallet,
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -54,7 +53,7 @@ export default async function ContractsPage({
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
   const search = params.q ?? "";
 
-  let stats = { total: 0, active: 0, draft: 0, completed: 0, total_value: 0 };
+  let stats = { total: 0, active: 0, draft: 0, completed: 0 };
   let listResult: Awaited<ReturnType<typeof listContracts>> = {
     rows: [],
     total: 0,
@@ -97,7 +96,7 @@ export default async function ContractsPage({
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatsCard
           label="Tổng hợp đồng"
           value={stats.total}
@@ -115,12 +114,6 @@ export default async function ContractsPage({
           value={stats.draft}
           icon={CircleDashed}
           tone="slate"
-        />
-        <StatsCard
-          label="Tổng giá trị"
-          value={`${(stats.total_value / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`}
-          icon={Wallet}
-          tone="violet"
         />
       </div>
 
@@ -183,7 +176,6 @@ function ContractTable({
             <TableHead className="w-32">Mã</TableHead>
             <TableHead>Hợp đồng</TableHead>
             {canManage && <TableHead>Khách hàng</TableHead>}
-            <TableHead className="text-right">Giá trị (VND)</TableHead>
             <TableHead>Trạng thái</TableHead>
             <TableHead>Bắt đầu</TableHead>
             <TableHead>Kết thúc</TableHead>
@@ -223,9 +215,6 @@ function ContractTable({
                   )}
                 </TableCell>
               )}
-              <TableCell className="text-right font-medium text-slate-700">
-                {Number(row.total_value).toLocaleString("vi-VN")}
-              </TableCell>
               <TableCell>
                 <ContractStatusBadge status={row.status} />
               </TableCell>

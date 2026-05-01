@@ -25,6 +25,9 @@ import {
  * Server Components cannot pass function references (Lucide icon components)
  * across the RSC boundary, so the Sidebar selects + filters nav items itself
  * using the serializable `audience` + `internalRole` props.
+ *
+ * Desktop: rendered inline at >= lg breakpoint.
+ * Mobile: hidden here — see <MobileSidebar /> for the drawer variant.
  */
 export function Sidebar({
   audience,
@@ -32,6 +35,23 @@ export function Sidebar({
 }: {
   audience: Audience;
   internalRole: InternalRole | null;
+}) {
+  return (
+    <aside className="hidden h-full w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+      <SidebarContent audience={audience} internalRole={internalRole} />
+    </aside>
+  );
+}
+
+/** Pure nav content — reused by desktop sidebar and mobile drawer. */
+export function SidebarContent({
+  audience,
+  internalRole,
+  onNavigate,
+}: {
+  audience: Audience;
+  internalRole: InternalRole | null;
+  onNavigate?: () => void;
 }) {
   const items = useMemo(
     () =>
@@ -43,7 +63,7 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
+    <>
       <div className="flex h-16 items-center border-b border-slate-200 px-5">
         <ClickstarLogo variant="dark" size="sm" showTagline={false} />
       </div>
@@ -51,7 +71,12 @@ export function Sidebar({
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-0.5">
           {items.map((item) => (
-            <SidebarItem key={item.href} item={item} pathname={pathname} />
+            <SidebarItem
+              key={item.href}
+              item={item}
+              pathname={pathname}
+              onNavigate={onNavigate}
+            />
           ))}
         </nav>
       </ScrollArea>
@@ -59,11 +84,19 @@ export function Sidebar({
       <div className="border-t border-slate-200 px-3 py-4">
         <SupportCard />
       </div>
-    </aside>
+    </>
   );
 }
 
-function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
+function SidebarItem({
+  item,
+  pathname,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
   const isActive = useMemo(() => isItemActive(item, pathname), [item, pathname]);
   const hasChildren = !!item.children?.length;
   const childIsActive = useMemo(
@@ -86,6 +119,7 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
     return (
       <Link
         href={item.href}
+        onClick={onNavigate}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
           isActive
@@ -127,6 +161,7 @@ function SidebarItem({ item, pathname }: { item: NavItem; pathname: string }) {
               <Link
                 key={child.href}
                 href={child.href}
+                onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                   active

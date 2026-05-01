@@ -4,7 +4,10 @@ import { useSyncExternalStore } from "react";
 import { Bell, HelpCircle, Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { ClickstarLogo } from "@/components/clickstar-logo";
 import { Separator } from "@/components/ui/separator";
+import type { Audience, InternalRole } from "@/lib/database.types";
+import { MobileSidebar } from "./mobile-sidebar";
 import { UserMenu } from "./user-menu";
 
 const subscribeNoop = () => () => {};
@@ -17,12 +20,16 @@ export function HeaderBar({
   email,
   avatarUrl,
   role,
+  audience,
+  internalRole,
   unreadNotifications = 0,
 }: {
   fullName: string;
   email: string;
   avatarUrl: string | null;
   role: string;
+  audience: Audience;
+  internalRole: InternalRole | null;
   unreadNotifications?: number;
 }) {
   const shortcutLabel = useSyncExternalStore(
@@ -32,8 +39,16 @@ export function HeaderBar({
   );
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-6 backdrop-blur">
-      <div className="relative flex-1 max-w-xl">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-slate-200 bg-white/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
+      <MobileSidebar audience={audience} internalRole={internalRole} />
+
+      {/* Compact logo for mobile (sidebar is hidden, but we still want branding) */}
+      <div className="flex items-center lg:hidden">
+        <ClickstarLogo variant="dark" size="sm" showTagline={false} />
+      </div>
+
+      {/* Search: hidden on mobile to free space; show on tablet+ */}
+      <div className="relative hidden flex-1 sm:block sm:max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
@@ -46,6 +61,15 @@ export function HeaderBar({
       </div>
 
       <div className="ml-auto flex items-center gap-1">
+        {/* Quick search icon on mobile (placeholder — opens search later) */}
+        <button
+          type="button"
+          aria-label="Tìm kiếm"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:hidden"
+        >
+          <Search className="h-5 w-5" />
+        </button>
+
         <button
           type="button"
           aria-label="Thông báo"
@@ -64,12 +88,12 @@ export function HeaderBar({
         <button
           type="button"
           aria-label="Trợ giúp"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          className="hidden h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:inline-flex"
         >
           <HelpCircle className="h-5 w-5" />
         </button>
 
-        <Separator orientation="vertical" className="mx-2 h-6" />
+        <Separator orientation="vertical" className="mx-1 hidden h-6 sm:mx-2 sm:block" />
 
         <UserMenu
           fullName={fullName}

@@ -17,13 +17,23 @@ import { cn } from "@/lib/utils";
 import type { ContractServiceLineInput } from "@/lib/validation/contracts";
 import type { ServiceOption } from "@/lib/queries/contracts";
 
+export type TemplateOption = {
+  id: string;
+  name: string;
+  industry: string | null;
+  duration_days: number | null;
+  version: number;
+};
+
 export function ContractServicesEditor({
   services,
   options,
+  templates,
   onChange,
 }: {
   services: ContractServiceLineInput[];
   options: ServiceOption[];
+  templates: TemplateOption[];
   onChange: (next: ContractServiceLineInput[]) => void;
 }) {
   const optionsById = useMemo(() => {
@@ -32,11 +42,18 @@ export function ContractServicesEditor({
     return map;
   }, [options]);
 
+  const templatesById = useMemo(() => {
+    const map = new Map<string, TemplateOption>();
+    for (const t of templates) map.set(t.id, t);
+    return map;
+  }, [templates]);
+
   const addRow = () => {
     onChange([
       ...services,
       {
         service_id: "",
+        template_id: null,
         starts_at: "",
         ends_at: "",
         notes: "",
@@ -68,8 +85,8 @@ export function ContractServicesEditor({
             key={idx}
             className="rounded-lg border border-slate-200 bg-white p-4"
           >
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
+            <div className="grid gap-3 md:grid-cols-12">
+              <div className="md:col-span-6">
                 <Label className="text-xs font-medium text-slate-500">
                   Dịch vụ
                 </Label>
@@ -100,17 +117,54 @@ export function ContractServicesEditor({
                   </SelectContent>
                 </Select>
               </div>
-              <button
-                type="button"
-                onClick={() => removeRow(idx)}
-                aria-label="Xoá dòng"
-                className={cn(
-                  "inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-500",
-                  "hover:bg-rose-50 hover:text-rose-600",
-                )}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="md:col-span-5">
+                <Label className="text-xs font-medium text-slate-500">
+                  Template triển khai
+                </Label>
+                <Select
+                  value={line.template_id ?? "none"}
+                  onValueChange={(v) =>
+                    updateRow(idx, {
+                      template_id: !v || v === "none" ? null : v,
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Không dùng template">
+                      {(value: string | null) => {
+                        if (!value || value === "none") return "Không dùng template";
+                        const t = templatesById.get(value);
+                        if (!t) return value;
+                        return `${t.name}${t.industry ? ` · ${t.industry}` : ""} · v${t.version}`;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không dùng template</SelectItem>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                        {t.industry ? ` · ${t.industry}` : ""}
+                        {t.duration_days ? ` · ${t.duration_days}d` : ""}
+                        {" "}· v{t.version}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end justify-end md:col-span-1">
+                <button
+                  type="button"
+                  onClick={() => removeRow(idx)}
+                  aria-label="Xoá dòng"
+                  className={cn(
+                    "inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-500",
+                    "hover:bg-rose-50 hover:text-rose-600",
+                  )}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-3">

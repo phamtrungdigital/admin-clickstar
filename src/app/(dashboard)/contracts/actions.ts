@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalAction } from "@/lib/auth/guards";
+import { forkTemplateCore } from "@/lib/projects/fork";
 import {
   createContractSchema,
   normalizeContractInput,
@@ -84,6 +85,42 @@ export async function createContractAction(
     }
   }
 
+  // Auto-fork: for each service line that picked a template, clone it into
+  // a project. Best-effort — if a fork fails we keep the contract and
+  // surface a partial-success message; admin can fork manually from the
+  // contract detail page.
+  const linesWithTemplate = parsed.data.services.filter(
+    (s): s is ContractServiceLineInput & { template_id: string } =>
+      typeof s.template_id === "string" && s.template_id.length > 0,
+  );
+  const failedForks: string[] = [];
+  if (linesWithTemplate.length > 0) {
+    const fallbackStartIso =
+      payload.starts_at ?? new Date().toISOString().slice(0, 10);
+    for (const line of linesWithTemplate) {
+      const startsAt = line.starts_at?.length ? line.starts_at : fallbackStartIso;
+      // Build a project name from the service+template pair so the admin
+      // can immediately tell projects apart (a contract may host SEO + Ads
+      // forks side by side).
+      const projectName = await buildProjectName(
+        supabase,
+        line.service_id,
+        line.template_id,
+        payload.name as string,
+      );
+      const result = await forkTemplateCore(supabase, user.id, {
+        contractId: contract.id,
+        templateId: line.template_id,
+        name: projectName,
+        startsAt,
+        pmId: null,
+      });
+      if (!result.ok) {
+        failedForks.push(`${projectName}: ${result.message}`);
+      }
+    }
+  }
+
   await logAudit({
     user_id: user.id,
     company_id: payload.company_id,
@@ -94,11 +131,41 @@ export async function createContractAction(
       name: payload.name,
       code: payload.code,
       status: payload.status,
+      auto_forked_projects: linesWithTemplate.length - failedForks.length,
     },
   });
 
   revalidatePath("/contracts");
+  revalidatePath("/projects");
+
+  if (failedForks.length > 0) {
+    return {
+      ok: false,
+      message: `Đã tạo hợp đồng nhưng một số template chưa fork được: ${failedForks.join("; ")}`,
+    };
+  }
   return { ok: true, data: { id: contract.id } };
+}
+
+async function buildProjectName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  serviceId: string,
+  templateId: string,
+  contractName: string,
+): Promise<string> {
+  const { data: service } = await supabase
+    .from("services")
+    .select("name")
+    .eq("id", serviceId)
+    .maybeSingle();
+  const { data: template } = await supabase
+    .from("service_templates")
+    .select("name")
+    .eq("id", templateId)
+    .maybeSingle();
+  const svcName = (service?.name as string | undefined) ?? "Dịch vụ";
+  const tplName = (template?.name as string | undefined) ?? "Template";
+  return `${svcName} (${tplName}) — ${contractName}`;
 }
 
 export async function updateContractAction(

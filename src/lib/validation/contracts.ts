@@ -14,9 +14,14 @@ const CONTRACT_STATUS = [
  * One service line in a contract. Pricing fields (unit_price/quantity) live
  * in the DB with safe defaults but are intentionally not collected in the
  * form — cost control is a separate, future feature.
+ *
+ * `template_id` (optional) lets the admin pick a service-template so that
+ * when the contract is saved the system auto-forks the template into a
+ * real project. PRD §4.2 step 3.
  */
 export const contractServiceLineSchema = z.object({
   service_id: z.string().uuid("Chọn dịch vụ"),
+  template_id: z.string().uuid().nullable(),
   starts_at: trimmed.max(20),
   ends_at: trimmed.max(20),
   notes: trimmed.max(500),

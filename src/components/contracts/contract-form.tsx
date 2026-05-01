@@ -28,7 +28,7 @@ import {
   updateContractAction,
 } from "@/app/(dashboard)/contracts/actions";
 import type { ServiceOption } from "@/lib/queries/contracts";
-import { ContractServicesEditor } from "./contract-services-editor";
+import { ContractServicesEditor, type TemplateOption } from "./contract-services-editor";
 import { ContractAttachmentField } from "./contract-attachment-field";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,7 @@ export type ContractFormProps = {
   defaultValues?: Partial<CreateContractInput>;
   companies: Array<{ id: string; name: string; code: string | null }>;
   services: ServiceOption[];
+  templates: TemplateOption[];
 };
 
 export function ContractForm({
@@ -46,6 +47,7 @@ export function ContractForm({
   defaultValues,
   companies,
   services,
+  templates,
 }: ContractFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -205,6 +207,7 @@ export function ContractForm({
             <ContractServicesEditor
               services={field.value ?? []}
               options={services}
+              templates={templates}
               onChange={field.onChange}
             />
           )}

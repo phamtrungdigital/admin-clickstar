@@ -14,6 +14,7 @@ import {
   ShieldUser,
   Settings,
   Bell,
+  FolderKanban,
 } from "lucide-react";
 import type { InternalRole } from "@/lib/database.types";
 
@@ -30,6 +31,7 @@ export const internalNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
   { label: "Khách hàng", href: "/customers", icon: Users },
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
+  { label: "Dự án", href: "/projects", icon: FolderKanban },
   { label: "Dịch vụ", href: "/services", icon: Package },
   {
     label: "Vận hành",
@@ -75,6 +77,7 @@ export const internalNav: NavItem[] = [
 export const customerNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
   { label: "Ticket của tôi", href: "/tickets", icon: Ticket },
+  { label: "Dự án", href: "/projects", icon: FolderKanban },
   { label: "Dịch vụ", href: "/services", icon: Package },
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
   { label: "Tài liệu", href: "/documents", icon: FolderOpen },

@@ -19,6 +19,7 @@ const CUSTOMER_ALLOWED_EXACT = new Set([
   "/dashboard",
   "/services",
   "/contracts",
+  "/projects",
   "/tickets",
   "/documents",
   "/notifications",
@@ -32,6 +33,8 @@ function isCustomerAllowed(pathname: string): boolean {
   if (/^\/tickets\/[^/]+$/.test(pathname)) return true;
   // Allow read-only contract detail (no /new, no /edit).
   if (/^\/contracts\/[^/]+$/.test(pathname)) return true;
+  // Allow project detail (read-only, snapshot-fed).
+  if (/^\/projects\/[^/]+$/.test(pathname)) return true;
   return false;
 }
 

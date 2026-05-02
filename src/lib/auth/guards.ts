@@ -28,10 +28,10 @@ export function canManageCustomers(
   );
 }
 
-/** Contracts contain financial info (value, VAT) — staff "only follow
- *  customers, not contracts" per anh's 2026-05-02 decision. Customers
- *  always see their own contracts. Internal: manager+ and accountant
- *  only. Mirrors ROLES_CONTRACT in nav-config.ts.  */
+/** Contracts contain financial info (value, VAT) — anh re-confirm
+ *  2026-05-02: HĐ ít + chất, anh tự quản lý. Internal chỉ super_admin /
+ *  admin xem được. Customer luôn xem HĐ của họ. Manager / staff / support
+ *  / accountant đều không thấy. Mirrors ROLES_CONTRACT in nav-config.ts. */
 export function canSeeContracts(profile: ProfileRow | null): boolean {
   if (!profile) return false;
   if (profile.audience === "customer") return true;
@@ -39,8 +39,6 @@ export function canSeeContracts(profile: ProfileRow | null): boolean {
   return (
     profile.internal_role === "super_admin"
     || profile.internal_role === "admin"
-    || profile.internal_role === "manager"
-    || profile.internal_role === "accountant"
   );
 }
 

@@ -100,12 +100,22 @@ export type TicketStats = {
   resolved: number;
 };
 
-export async function getTicketStats(): Promise<TicketStats> {
+export async function getTicketStats(params: {
+  reporter_id?: string;
+} = {}): Promise<TicketStats> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("tickets")
     .select("status")
     .is("deleted_at", null);
+  // Khi caller là customer, /tickets page truyền reporter_id để stats
+  // chỉ đếm ticket họ tạo — khớp với danh sách bên dưới (cũng filter
+  // reporter_id). Trước đây stats lấy tổng theo company → KH thấy số
+  // lớn hơn list, gây nhầm lẫn.
+  if (params.reporter_id) {
+    query = query.eq("reporter_id", params.reporter_id);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
 
   const stats = { total: 0, open: 0, in_progress: 0, resolved: 0 };

@@ -73,7 +73,9 @@ export default async function TicketsPage({
 
   try {
     [stats, listResult] = await Promise.all([
-      getTicketStats(),
+      // Stats phải khớp scope của list bên dưới: customer chỉ đếm ticket
+      // do họ tạo, internal đếm tất cả (theo RLS access).
+      getTicketStats({ reporter_id: canManage ? undefined : userId }),
       listTickets({
         search,
         status,

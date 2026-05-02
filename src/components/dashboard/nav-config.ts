@@ -140,12 +140,15 @@ export const internalNav: NavItem[] = [
  * Customer portal nav. Ticket-centric — the customer's primary loop is
  * "file ticket → wait for reply → acknowledge". /tickets/new is exposed as a
  * pinned CTA in the sidebar, not as a nav row.
+ *
+ * Anh chốt 2026-05-02: bỏ "Dịch vụ" khỏi sidebar customer — trùng với
+ * Hợp đồng (đã liệt kê service lines) và Dự án (KH cần biết tiến độ thực
+ * tế hơn là catalog). Tổng quan đã có "Dịch vụ đang triển khai".
  */
 export const customerNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
   { label: "Ticket của tôi", href: "/tickets", icon: Ticket },
   { label: "Dự án", href: "/projects", icon: FolderKanban },
-  { label: "Dịch vụ", href: "/services", icon: Package },
   { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
   { label: "Tài liệu", href: "/documents", icon: FolderOpen },
   { label: "Thông báo", href: "/notifications", icon: Bell },

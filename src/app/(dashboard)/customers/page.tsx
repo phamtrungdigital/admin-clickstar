@@ -6,6 +6,7 @@ import {
   Plus,
   RefreshCcw,
   ShieldCheck,
+  Sparkles,
   TrendingUp,
 } from "lucide-react";
 
@@ -77,15 +78,26 @@ export default async function CustomersPage({
         description="Danh sách doanh nghiệp đang hợp tác với Clickstar."
         breadcrumb={[{ label: "Trang chủ", href: "/dashboard" }, { label: "Khách hàng" }]}
         actions={
-          <Link
-            href="/customers/new"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "bg-blue-600 px-4 text-white hover:bg-blue-700",
-            )}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Thêm khách hàng
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/customers/new"
+              className={cn(
+                buttonVariants({ size: "lg", variant: "outline" }),
+                "px-4",
+              )}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Tạo chi tiết
+            </Link>
+            <Link
+              href="/customers/onboard"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "bg-blue-600 px-4 text-white hover:bg-blue-700",
+              )}
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Onboard nhanh
+            </Link>
+          </div>
         }
       />
 

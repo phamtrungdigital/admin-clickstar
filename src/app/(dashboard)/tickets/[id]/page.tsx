@@ -13,6 +13,8 @@ import {
 import { TicketAttachmentsDisplay } from "@/components/tickets/ticket-attachments-display";
 import { getTicketById } from "@/lib/queries/tickets";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { isInternal } from "@/lib/auth/guards";
 
 export const metadata = { title: "Chi tiết ticket | Portal.Clickstar.vn" };
 
@@ -22,8 +24,12 @@ export default async function TicketDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const ticket = await getTicketById(id).catch(() => null);
+  const [{ profile }, ticket] = await Promise.all([
+    getCurrentUser(),
+    getTicketById(id).catch(() => null),
+  ]);
   if (!ticket) notFound();
+  const canSeeAssignee = isInternal(profile);
 
   // Pre-sign attachment URLs server-side so the client doesn't need to make
   // a round-trip on render.
@@ -135,11 +141,13 @@ export default async function TicketDetailPage({
                   )
                 }
               />
-              <Row
-                icon={User}
-                label="Phụ trách"
-                value={ticket.assignee?.full_name ?? "Chưa phân công"}
-              />
+              {canSeeAssignee && (
+                <Row
+                  icon={User}
+                  label="Phụ trách"
+                  value={ticket.assignee?.full_name ?? "Chưa phân công"}
+                />
+              )}
             </dl>
           </div>
 

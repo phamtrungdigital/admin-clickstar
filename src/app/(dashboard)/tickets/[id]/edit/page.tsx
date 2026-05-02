@@ -5,6 +5,7 @@ import { TicketForm } from "@/components/tickets/ticket-form";
 import { getTicketById } from "@/lib/queries/tickets";
 import { listActiveCompaniesForSelect } from "@/lib/queries/contracts";
 import { listInternalStaff } from "@/lib/queries/customers";
+import { requireInternalPage } from "@/lib/auth/guards";
 
 export const metadata = { title: "Sửa ticket | Portal.Clickstar.vn" };
 
@@ -13,6 +14,10 @@ export default async function EditTicketPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Edit ticket form chứa fields nhân viên-only (assignee, status, mã,
+  // company). Khách hàng chỉ tạo + comment, không edit form nội bộ.
+  await requireInternalPage();
+
   const { id } = await params;
   const [ticket, companies, staff] = await Promise.all([
     getTicketById(id).catch(() => null),

@@ -42,6 +42,11 @@ export type TicketFormProps = {
   defaultValues?: Partial<CreateTicketInput>;
   companies: Array<{ id: string; name: string; code: string | null }>;
   staff: Array<{ id: string; full_name: string; internal_role: string | null }>;
+  /** "internal" = full form (PM tạo ticket cho khách: chọn KH, mã, status,
+   *  assignee). "customer" = simplified (KH chỉ điền tiêu đề/mô tả/độ ưu
+   *  tiên/đính kèm — server tự fill company_id + status="new" + assignee).
+   *  Default: "internal" để giữ backward compat khi gọi không truyền. */
+  audience?: "internal" | "customer";
 };
 
 export function TicketForm({
@@ -50,7 +55,9 @@ export function TicketForm({
   defaultValues,
   companies,
   staff,
+  audience = "internal",
 }: TicketFormProps) {
+  const isCustomer = audience === "customer";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -147,43 +154,51 @@ export function TicketForm({
               placeholder="VD: Website lỗi không load được trang chủ"
             />
           </Field>
-          <Field label="Khách hàng *" error={errors.company_id?.message}>
-            <Controller
-              control={control}
-              name="company_id"
-              render={({ field }) => (
-                <Select
-                  value={field.value || undefined}
-                  onValueChange={field.onChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn khách hàng">
-                      {(value: string | null) => {
-                        if (!value) return null;
-                        const c = companies.find((co) => co.id === value);
-                        if (!c) return value;
-                        return c.code ? `${c.name} · ${c.code}` : c.name;
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                        {c.code ? ` · ${c.code}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label="Mã ticket" error={errors.code?.message}>
-            <Input
-              {...register("code")}
-              placeholder="Tự động hoặc nhập thủ công, VD: TKT-2026-0001"
-            />
-          </Field>
+          {isCustomer ? (
+            // Customer: company_id đã pre-fill từ session, KH chỉ thấy 1 dòng
+            // info read-only (không sửa được). Mã ticket ẩn — server tự sinh.
+            <input type="hidden" {...register("company_id")} />
+          ) : (
+            <>
+              <Field label="Khách hàng *" error={errors.company_id?.message}>
+                <Controller
+                  control={control}
+                  name="company_id"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || undefined}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn khách hàng">
+                          {(value: string | null) => {
+                            if (!value) return null;
+                            const c = companies.find((co) => co.id === value);
+                            if (!c) return value;
+                            return c.code ? `${c.name} · ${c.code}` : c.name;
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                            {c.code ? ` · ${c.code}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field label="Mã ticket" error={errors.code?.message}>
+                <Input
+                  {...register("code")}
+                  placeholder="Tự động hoặc nhập thủ công, VD: TKT-2026-0001"
+                />
+              </Field>
+            </>
+          )}
           <Field
             label="Mô tả chi tiết"
             error={errors.description?.message}
@@ -217,10 +232,19 @@ export function TicketForm({
       </FormSection>
 
       <FormSection
-        title="Phân loại & phân công"
-        description="Thiết lập độ ưu tiên, trạng thái xử lý và người phụ trách."
+        title={isCustomer ? "Mức độ" : "Phân loại & phân công"}
+        description={
+          isCustomer
+            ? "Đánh giá độ khẩn cấp giúp Clickstar ưu tiên xử lý đúng thứ tự."
+            : "Thiết lập độ ưu tiên, trạng thái xử lý và người phụ trách."
+        }
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div
+          className={cn(
+            "grid gap-4",
+            isCustomer ? "md:grid-cols-1" : "md:grid-cols-3",
+          )}
+        >
           <Field label="Mức ưu tiên *" error={errors.priority?.message}>
             <Controller
               control={control}
@@ -249,67 +273,71 @@ export function TicketForm({
               )}
             />
           </Field>
-          <Field label="Trạng thái *" error={errors.status?.message}>
-            <Controller
-              control={control}
-              name="status"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chọn trạng thái">
-                      {(value: string | null) => {
-                        if (!value) return null;
-                        return (
-                          TICKET_STATUS_OPTIONS.find((o) => o.value === value)
-                            ?.label ?? value
-                        );
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TICKET_STATUS_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label="Người phụ trách" error={errors.assignee_id?.message}>
-            <Controller
-              control={control}
-              name="assignee_id"
-              render={({ field }) => (
-                <Select
-                  value={field.value ?? NO_ASSIGNEE}
-                  onValueChange={(v) =>
-                    field.onChange(v === NO_ASSIGNEE ? null : v)
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Chưa phân công">
-                      {(value: string | null) => {
-                        if (!value || value === NO_ASSIGNEE)
-                          return "Chưa phân công";
-                        const m = staff.find((s) => s.id === value);
-                        return m?.full_name || "(chưa đặt tên)";
-                      }}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_ASSIGNEE}>Chưa phân công</SelectItem>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name || "(chưa đặt tên)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
+          {!isCustomer && (
+            <>
+              <Field label="Trạng thái *" error={errors.status?.message}>
+                <Controller
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chọn trạng thái">
+                          {(value: string | null) => {
+                            if (!value) return null;
+                            return (
+                              TICKET_STATUS_OPTIONS.find((o) => o.value === value)
+                                ?.label ?? value
+                            );
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TICKET_STATUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field label="Người phụ trách" error={errors.assignee_id?.message}>
+                <Controller
+                  control={control}
+                  name="assignee_id"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? NO_ASSIGNEE}
+                      onValueChange={(v) =>
+                        field.onChange(v === NO_ASSIGNEE ? null : v)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Chưa phân công">
+                          {(value: string | null) => {
+                            if (!value || value === NO_ASSIGNEE)
+                              return "Chưa phân công";
+                            const m = staff.find((s) => s.id === value);
+                            return m?.full_name || "(chưa đặt tên)";
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_ASSIGNEE}>Chưa phân công</SelectItem>
+                        {staff.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.full_name || "(chưa đặt tên)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+            </>
+          )}
         </div>
       </FormSection>
 

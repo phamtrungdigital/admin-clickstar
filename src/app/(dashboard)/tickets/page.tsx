@@ -197,7 +197,7 @@ function TicketTable({
             <TableHead>Khách hàng</TableHead>
             <TableHead>Mức ưu tiên</TableHead>
             <TableHead>Trạng thái</TableHead>
-            <TableHead>Phụ trách</TableHead>
+            {canManage && <TableHead>Phụ trách</TableHead>}
             <TableHead>Tạo lúc</TableHead>
             {canManage && <TableHead className="w-12 text-right">{""}</TableHead>}
           </TableRow>
@@ -242,11 +242,13 @@ function TicketTable({
               <TableCell>
                 <TicketStatusBadge status={row.status} />
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
-                {row.assignee?.full_name ?? (
-                  <span className="text-slate-400">—</span>
-                )}
-              </TableCell>
+              {canManage && (
+                <TableCell className="text-sm text-slate-600">
+                  {row.assignee?.full_name ?? (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell className="text-sm text-slate-500">
                 {format(new Date(row.created_at), "dd/MM/yyyy")}
               </TableCell>

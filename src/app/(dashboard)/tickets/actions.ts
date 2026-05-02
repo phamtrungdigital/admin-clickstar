@@ -70,7 +70,61 @@ export async function createTicketAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
 
-  const payload = normalizeTicketInput(parsed.data);
+  // Determine the caller's audience to apply customer-side guardrails.
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("audience")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isCustomer = callerProfile?.audience === "customer";
+
+  const normalized = normalizeTicketInput(parsed.data);
+  // Use a loose record shape from here on so customer overrides can null
+  // out the `code` field (zod schema types it as string for the form).
+  let payload: Record<string, unknown> = { ...normalized };
+
+  if (isCustomer) {
+    // Defence in depth: customer cannot pick assignee, status, or company.
+    // Resolve their company from company_members + auto-assign to the
+    // primary Account Manager if available; admins phân công thủ công sau
+    // nếu KH chưa có AM.
+    const { data: membership } = await supabase
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    if (!membership?.company_id) {
+      return {
+        ok: false,
+        message:
+          "Tài khoản của bạn chưa được gắn vào doanh nghiệp nào. Liên hệ Clickstar để được hỗ trợ.",
+      };
+    }
+
+    const companyId = membership.company_id as string;
+    let primaryAm: string | null = null;
+    const { data: assignment } = await supabase
+      .from("company_assignments")
+      .select("internal_user_id")
+      .eq("company_id", companyId)
+      .eq("role", "account_manager")
+      .eq("is_primary", true)
+      .limit(1)
+      .maybeSingle();
+    if (assignment?.internal_user_id) {
+      primaryAm = assignment.internal_user_id as string;
+    }
+
+    payload = {
+      ...payload,
+      company_id: companyId,
+      status: "new",
+      assignee_id: primaryAm,
+      // Mã ticket: để DB tự sinh (server side), bỏ mọi value khách post lên.
+      code: null,
+    };
+  }
 
   const { data, error } = await supabase
     .from("tickets")
@@ -95,7 +149,10 @@ export async function createTicketAction(
     user_id: rid,
     company_id: data.company_id,
     title: `Ticket mới: ${data.title}`,
-    body: payload.description?.slice(0, 200) ?? null,
+    body:
+      typeof payload.description === "string"
+        ? payload.description.slice(0, 200)
+        : null,
     link_url: `/tickets/${data.id}`,
     entity_type: "ticket",
     entity_id: data.id,

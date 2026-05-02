@@ -135,11 +135,15 @@ export async function getCustomerTicketStats(
   userId: string,
 ): Promise<CustomerTicketStats> {
   const supabase = await createClient();
-  const nowIso = new Date().toISOString();
 
+  // Bug fix 2026-05-02: trước đây SELECT `due_at` — nhưng bảng tickets
+  // không có column này (due_at chỉ tồn tại ở bảng tasks). Query throw,
+  // catch ở dashboard trả null → toàn bộ stats hiển thị "—". Bỏ due_at
+  // ra; overdue dùng heuristic "ticket new/in_progress/awaiting_customer
+  // mà tạo > 7 ngày chưa close" — đến khi có cơ chế SLA chính thức.
   const { data, error } = await supabase
     .from("tickets")
-    .select("status, due_at, closed_at")
+    .select("status, created_at, closed_at")
     .eq("reporter_id", userId)
     .is("deleted_at", null);
   if (error) throw new Error(error.message);
@@ -151,6 +155,7 @@ export async function getCustomerTicketStats(
     resolved: 0,
     overdue: 0,
   };
+  const overdueThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
   for (const row of data ?? []) {
     stats.total += 1;
     if (row.status === "in_progress") stats.in_progress += 1;
@@ -162,7 +167,7 @@ export async function getCustomerTicketStats(
       row.status === "new" ||
       row.status === "in_progress" ||
       row.status === "awaiting_customer";
-    if (open && row.due_at && row.due_at < nowIso) {
+    if (open && new Date(row.created_at).getTime() < overdueThreshold) {
       stats.overdue += 1;
     }
   }

@@ -12,6 +12,8 @@ import {
   type CreateCompanyInput,
   type UpdateCompanyInput,
 } from "@/lib/validation/companies";
+import { onboardSchema, type OnboardInput } from "@/lib/validation/onboard";
+import { createContractAction } from "@/app/(dashboard)/contracts/actions";
 import { logAudit } from "@/lib/audit";
 
 export type ActionResult<T = void> =
@@ -360,4 +362,93 @@ export async function removeCompanyMemberAction(
 
   revalidatePath(`/customers/${companyId}`);
   return { ok: true };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Onboard wizard — composite create (customer + optional contract).
+// ────────────────────────────────────────────────────────────────────────────
+
+export type OnboardActionResult = ActionResult<{
+  customerId: string;
+  contractId: string | null;
+  /** Set when contract was attempted but failed — UI surfaces a partial-
+   *  success message and routes the user to /customers/{id} to retry. */
+  contractWarning: string | null;
+}>;
+
+/**
+ * Sequential, best-effort:
+ *  1) Create the customer (delegates to createCustomerAction so the role-
+ *     based AM enforcement, audit logging, and RLS rules stay consistent).
+ *  2) If the wizard included contract data, create the contract for that
+ *     new customer (delegates to createContractAction — already handles
+ *     auto-fork of templates per service line).
+ *
+ * If step 2 fails after step 1 succeeded we DON'T roll back the customer:
+ * fork-template side effects span multiple tables and the cascade undo is
+ * messy; the user usually still wants the customer recorded and can finish
+ * the contract from /customers/{id}.
+ */
+export async function onboardCustomerAction(
+  input: OnboardInput,
+): Promise<OnboardActionResult> {
+  const parsed = onboardSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Dữ liệu không hợp lệ",
+      fieldErrors: flattenZodErrors(parsed.error),
+    };
+  }
+
+  const customerResult = await createCustomerAction(parsed.data.customer);
+  if (!customerResult.ok) return customerResult;
+  const customerId = customerResult.data!.id;
+
+  const contractInput = parsed.data.contract;
+  if (!contractInput) {
+    revalidatePath("/customers");
+    return {
+      ok: true,
+      data: { customerId, contractId: null, contractWarning: null },
+    };
+  }
+
+  const contractResult = await createContractAction({
+    ...contractInput,
+    company_id: customerId,
+  });
+  if (!contractResult.ok) {
+    return {
+      ok: true,
+      data: {
+        customerId,
+        contractId: null,
+        contractWarning: contractResult.message,
+      },
+    };
+  }
+
+  revalidatePath("/customers");
+  revalidatePath("/contracts");
+  revalidatePath("/projects");
+  return {
+    ok: true,
+    data: {
+      customerId,
+      contractId: contractResult.data!.id,
+      contractWarning: null,
+    },
+  };
+}
+
+export async function onboardCustomerAndRedirect(
+  input: OnboardInput,
+): Promise<OnboardActionResult> {
+  const result = await onboardCustomerAction(input);
+  if (!result.ok) return result;
+  const target = result.data!.contractId
+    ? `/contracts/${result.data!.contractId}`
+    : `/customers/${result.data!.customerId}`;
+  redirect(target);
 }

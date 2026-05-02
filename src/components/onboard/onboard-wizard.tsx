@@ -43,7 +43,7 @@ import {
   type TemplateOption,
 } from "@/components/contracts/contract-services-editor";
 import type { ServiceOption } from "@/lib/queries/contracts";
-import { onboardCustomerAndRedirect } from "@/app/(dashboard)/customers/onboard/actions";
+import { onboardCustomerAndRedirect } from "@/app/(dashboard)/customers/actions";
 import type { ServicePickOption } from "@/components/customers/customer-form";
 
 const STEPS = [
@@ -281,7 +281,7 @@ export function OnboardWizard({
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Check className="mr-1.5 h-4 w-4" />
-              Tạo & xuất bản
+              Tạo khách hàng
             </Button>
           )}
         </div>

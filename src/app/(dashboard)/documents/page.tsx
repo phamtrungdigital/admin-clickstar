@@ -14,7 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listDocuments, type DocumentListItem } from "@/lib/queries/documents";
+import {
+  listDocuments,
+  type DocumentListItem,
+  type DocumentScope,
+} from "@/lib/queries/documents";
 import {
   DOCUMENT_KIND_LABEL,
   DOCUMENT_VISIBILITY_LABEL,
@@ -40,6 +44,7 @@ type SearchParams = {
   q?: string;
   kind?: string;
   visibility?: string;
+  scope?: string;
   page?: string;
 };
 
@@ -54,6 +59,7 @@ export default async function DocumentsPage({
   const search = params.q ?? "";
   const kind = (params.kind ?? "all") as DocumentKind | "all";
   const visibility = (params.visibility ?? "all") as DocumentVisibility | "all";
+  const scope = (params.scope ?? "all") as DocumentScope;
   const page = Number.parseInt(params.page ?? "1", 10) || 1;
 
   let listResult: Awaited<ReturnType<typeof listDocuments>> = {
@@ -65,7 +71,7 @@ export default async function DocumentsPage({
   let loadError: string | null = null;
 
   try {
-    listResult = await listDocuments({ search, kind, visibility, page });
+    listResult = await listDocuments({ search, kind, visibility, scope, page });
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Không tải được dữ liệu";
   }
@@ -103,6 +109,7 @@ export default async function DocumentsPage({
         search={search}
         kind={kind}
         visibility={visibility}
+        scope={scope}
         canManage={canManage}
       />
 
@@ -122,6 +129,7 @@ export default async function DocumentsPage({
             q: search || undefined,
             kind: kind !== "all" ? kind : undefined,
             visibility: visibility !== "all" ? visibility : undefined,
+            scope: scope !== "all" ? scope : undefined,
           }}
         />
       )}
@@ -185,7 +193,11 @@ function DocumentsTable({
                 {DOCUMENT_KIND_LABEL[row.kind]}
               </TableCell>
               <TableCell className="text-sm text-slate-700">
-                {row.company?.name ?? <span className="text-slate-400">—</span>}
+                {row.company?.name ?? (
+                  <span className="text-xs italic text-slate-500">
+                    — Nội bộ Clickstar —
+                  </span>
+                )}
               </TableCell>
               <TableCell>
                 <span
@@ -208,6 +220,7 @@ function DocumentsTable({
                   documentId={row.id}
                   visibility={row.visibility}
                   canManage={canManage}
+                  companyName={row.company?.name ?? null}
                 />
               </TableCell>
             </TableRow>

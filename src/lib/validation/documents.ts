@@ -51,30 +51,49 @@ const optionalText = (max: number) =>
     .nullable()
     .transform((v) => (v && v !== "" ? v : null));
 
-export const createDocumentSchema = z.object({
-  company_id: z.string().uuid("Chọn khách hàng"),
-  contract_id: optionalUuid,
-  project_id: optionalUuid,
-  ticket_id: optionalUuid,
-  kind: z.enum(DOCUMENT_KINDS),
-  name: trimmed.min(2, "Tên tài liệu tối thiểu 2 ký tự").max(255),
-  description: optionalText(500),
-  visibility: z.enum(DOCUMENT_VISIBILITIES),
-  storage_path: trimmed.min(1, "Thiếu đường dẫn file"),
-  mime_type: optionalText(255),
-  size_bytes: z.number().int().nonnegative().nullable(),
-});
+export const createDocumentSchema = z
+  .object({
+    company_id: optionalUuid,
+    contract_id: optionalUuid,
+    project_id: optionalUuid,
+    ticket_id: optionalUuid,
+    kind: z.enum(DOCUMENT_KINDS),
+    name: trimmed.min(2, "Tên tài liệu tối thiểu 2 ký tự").max(255),
+    description: optionalText(500),
+    visibility: z.enum(DOCUMENT_VISIBILITIES),
+    storage_path: trimmed.min(1, "Thiếu đường dẫn file"),
+    mime_type: optionalText(255),
+    size_bytes: z.number().int().nonnegative().nullable(),
+  })
+  .refine(
+    (v) => v.company_id !== null || v.visibility !== "shared",
+    {
+      path: ["visibility"],
+      message:
+        "Tài liệu nội bộ Clickstar (không gắn khách hàng) không thể đặt quyền 'Chia sẻ với khách'.",
+    },
+  );
 export type CreateDocumentInput = z.input<typeof createDocumentSchema>;
 export type CreateDocumentParsed = z.output<typeof createDocumentSchema>;
 
-export const updateDocumentSchema = z.object({
-  name: trimmed.min(2).max(255),
-  description: optionalText(500),
-  kind: z.enum(DOCUMENT_KINDS),
-  visibility: z.enum(DOCUMENT_VISIBILITIES),
-  contract_id: optionalUuid,
-  project_id: optionalUuid,
-});
+export const updateDocumentSchema = z
+  .object({
+    name: trimmed.min(2).max(255),
+    description: optionalText(500),
+    kind: z.enum(DOCUMENT_KINDS),
+    visibility: z.enum(DOCUMENT_VISIBILITIES),
+    company_id: optionalUuid,
+    contract_id: optionalUuid,
+    project_id: optionalUuid,
+  })
+  .refine(
+    (v) => v.company_id !== null || v.visibility !== "shared",
+    {
+      path: ["visibility"],
+      message:
+        "Tài liệu nội bộ không thể đặt quyền 'Chia sẻ với khách'.",
+    },
+  );
 export type UpdateDocumentInput = z.input<typeof updateDocumentSchema>;
 export type UpdateDocumentParsed = z.output<typeof updateDocumentSchema>;
 
@@ -84,3 +103,17 @@ export const setDocumentVisibilitySchema = z.object({
 export type SetDocumentVisibilityInput = z.infer<
   typeof setDocumentVisibilitySchema
 >;
+
+/** Where the file lives in Storage. Files for a customer go under
+ *  `companies/<id>/documents/...`; files with no owning company go
+ *  under `internal/...`. The storage RLS policy validates both. */
+export function buildDocumentStoragePath(
+  companyId: string | null,
+  filename: string,
+): string {
+  const ext = (filename.split(".").pop() || "bin").toLowerCase();
+  const uuid = crypto.randomUUID();
+  return companyId
+    ? `companies/${companyId}/documents/${uuid}.${ext}`
+    : `internal/${uuid}.${ext}`;
+}

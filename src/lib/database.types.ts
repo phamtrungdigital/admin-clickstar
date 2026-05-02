@@ -395,7 +395,9 @@ export interface TicketCommentRow extends Timestamps, SoftDeletable {
 
 export interface DocumentRow extends Timestamps, SoftDeletable {
   id: string;
-  company_id: string;
+  /** Owning company. NULL = internal-only Clickstar document
+   *  (training, processes, brand guides, ...). */
+  company_id: string | null;
   contract_id: string | null;
   project_id: string | null;
   ticket_id: string | null;

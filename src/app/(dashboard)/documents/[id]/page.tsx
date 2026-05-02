@@ -58,6 +58,7 @@ export default async function DocumentDetailPage({
               documentId={doc.id}
               visibility={doc.visibility}
               canManage={canManage}
+              companyName={doc.company?.name ?? null}
             />
           </div>
         }
@@ -82,9 +83,18 @@ export default async function DocumentDetailPage({
                 label={DOCUMENT_VISIBILITY_LABEL[doc.visibility]}
                 tone={VISIBILITY_TONE[doc.visibility]}
               />
-              {doc.company && (
-                <Pill label={`Khách: ${doc.company.name}`} />
-              )}
+              <Pill
+                label={
+                  doc.company
+                    ? `Khách: ${doc.company.name}`
+                    : "Tài liệu nội bộ Clickstar"
+                }
+                tone={
+                  doc.company
+                    ? undefined
+                    : "bg-violet-50 text-violet-700 ring-violet-200"
+                }
+              />
               {doc.project && (
                 <Pill label={`Dự án: ${doc.project.name}`} />
               )}

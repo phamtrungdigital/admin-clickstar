@@ -4,7 +4,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Upload, FileText, X } from "lucide-react";
+import { Info, Loader2, Upload, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
   DOCUMENT_KINDS,
   DOCUMENT_VISIBILITIES,
   DOCUMENT_VISIBILITY_LABEL,
+  buildDocumentStoragePath,
   createDocumentSchema,
   type CreateDocumentInput,
 } from "@/lib/validation/documents";
@@ -69,7 +70,7 @@ export function DocumentUploadForm({
   } = useForm<CreateDocumentInput>({
     resolver: zodResolver(createDocumentSchema),
     defaultValues: {
-      company_id: defaultValues?.company_id ?? "",
+      company_id: defaultValues?.company_id ?? null,
       contract_id: defaultValues?.contract_id ?? null,
       project_id: defaultValues?.project_id ?? null,
       ticket_id: defaultValues?.ticket_id ?? null,
@@ -85,13 +86,21 @@ export function DocumentUploadForm({
 
   const watchedCompanyId = watch("company_id");
   const watchedStoragePath = watch("storage_path");
+  const watchedVisibility = watch("visibility");
+  const isInternalOnly = !watchedCompanyId;
 
   const filteredProjects = useMemo(
-    () => projects.filter((p) => p.company_id === watchedCompanyId),
+    () =>
+      watchedCompanyId
+        ? projects.filter((p) => p.company_id === watchedCompanyId)
+        : projects,
     [projects, watchedCompanyId],
   );
   const filteredContracts = useMemo(
-    () => contracts.filter((c) => c.company_id === watchedCompanyId),
+    () =>
+      watchedCompanyId
+        ? contracts.filter((c) => c.company_id === watchedCompanyId)
+        : contracts,
     [contracts, watchedCompanyId],
   );
 
@@ -103,17 +112,12 @@ export function DocumentUploadForm({
       toast.error(`File quá ${MAX_BYTES / 1024 / 1024} MB`);
       return;
     }
-    if (!watchedCompanyId) {
-      toast.error("Vui lòng chọn khách hàng trước khi upload");
-      return;
-    }
 
     setFile(picked);
     setUploading(true);
     try {
       const supabase = createClient();
-      const ext = (picked.name.split(".").pop() || "bin").toLowerCase();
-      const path = `companies/${watchedCompanyId}/documents/${crypto.randomUUID()}.${ext}`;
+      const path = buildDocumentStoragePath(watchedCompanyId, picked.name);
       const { error } = await supabase.storage
         .from("documents")
         .upload(path, picked, {
@@ -177,19 +181,25 @@ export function DocumentUploadForm({
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <Label className="text-sm font-medium text-slate-700">
-              Khách hàng *
+              Thuộc khách hàng
             </Label>
             <Controller
               control={control}
               name="company_id"
               render={({ field }) => (
                 <Select
-                  value={field.value || undefined}
+                  value={field.value ?? "internal"}
                   onValueChange={(v) => {
-                    if (!v) return;
-                    field.onChange(v);
+                    const next = !v || v === "internal" ? null : v;
+                    field.onChange(next);
+                    // Reset project/contract; they'll get re-filtered by the
+                    // new company. When switching to "Nội bộ Clickstar",
+                    // also force visibility back to internal.
                     setValue("project_id", null);
                     setValue("contract_id", null);
+                    if (next === null && watchedVisibility === "shared") {
+                      setValue("visibility", "internal");
+                    }
                   }}
                 >
                   <SelectTrigger
@@ -198,9 +208,10 @@ export function DocumentUploadForm({
                       errors.company_id && "border-red-500",
                     )}
                   >
-                    <SelectValue placeholder="Chọn khách hàng">
+                    <SelectValue>
                       {(value: string | null) => {
-                        if (!value) return null;
+                        if (!value || value === "internal")
+                          return "— Nội bộ Clickstar —";
                         return (
                           companies.find((c) => c.id === value)?.name ?? value
                         );
@@ -208,6 +219,9 @@ export function DocumentUploadForm({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="internal">
+                      — Nội bộ Clickstar —
+                    </SelectItem>
                     {companies.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
@@ -217,6 +231,13 @@ export function DocumentUploadForm({
                 </Select>
               )}
             />
+            <p className="mt-1 inline-flex items-start gap-1 text-xs text-slate-500">
+              <Info className="mt-0.5 h-3 w-3 flex-shrink-0" />
+              <span>
+                Để trống nếu là tài liệu nội bộ Clickstar (training, quy trình,
+                brand). Có gắn KH thì khách của KH đó mới thấy được khi share.
+              </span>
+            </p>
             {errors.company_id && (
               <p className="mt-1 text-xs text-red-600">
                 {errors.company_id.message}
@@ -267,10 +288,21 @@ export function DocumentUploadForm({
               render={({ field }) => (
                 <Select
                   value={field.value || "none"}
-                  onValueChange={(v) =>
-                    field.onChange(v === "none" ? null : v)
-                  }
-                  disabled={!watchedCompanyId}
+                  onValueChange={(v) => {
+                    const next = v === "none" ? null : v;
+                    field.onChange(next);
+                    // Auto-fill company from the picked project. Useful when
+                    // the user starts from "Nội bộ Clickstar" but realises
+                    // the doc actually belongs to a project's customer.
+                    if (next) {
+                      const proj = projects.find((p) => p.id === next);
+                      if (proj && proj.company_id !== watchedCompanyId) {
+                        setValue("company_id", proj.company_id);
+                        setValue("contract_id", null);
+                      }
+                    }
+                  }}
+                  disabled={isInternalOnly && projects.length === 0}
                 >
                   <SelectTrigger className="mt-1.5 w-full">
                     <SelectValue>
@@ -288,6 +320,8 @@ export function DocumentUploadForm({
                     {filteredProjects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
+                        {isInternalOnly &&
+                          ` · ${companies.find((c) => c.id === p.company_id)?.name ?? ""}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -305,10 +339,16 @@ export function DocumentUploadForm({
               render={({ field }) => (
                 <Select
                   value={field.value || "none"}
-                  onValueChange={(v) =>
-                    field.onChange(v === "none" ? null : v)
-                  }
-                  disabled={!watchedCompanyId}
+                  onValueChange={(v) => {
+                    const next = v === "none" ? null : v;
+                    field.onChange(next);
+                    if (next) {
+                      const ct = contracts.find((c) => c.id === next);
+                      if (ct && ct.company_id !== watchedCompanyId) {
+                        setValue("company_id", ct.company_id);
+                      }
+                    }
+                  }}
                 >
                   <SelectTrigger className="mt-1.5 w-full">
                     <SelectValue>
@@ -371,7 +411,12 @@ export function DocumentUploadForm({
                   v && field.onChange(v as DocumentVisibility)
                 }
               >
-                <SelectTrigger className="mt-1.5 w-full">
+                <SelectTrigger
+                  className={cn(
+                    "mt-1.5 w-full",
+                    errors.visibility && "border-red-500",
+                  )}
+                >
                   <SelectValue>
                     {(value: string | null) =>
                       value
@@ -382,19 +427,31 @@ export function DocumentUploadForm({
                 </SelectTrigger>
                 <SelectContent>
                   {DOCUMENT_VISIBILITIES.map((v) => (
-                    <SelectItem key={v} value={v}>
+                    <SelectItem
+                      key={v}
+                      value={v}
+                      disabled={v === "shared" && isInternalOnly}
+                    >
                       {DOCUMENT_VISIBILITY_LABEL[v]}
+                      {v === "shared" && isInternalOnly && " (cần gắn KH)"}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           />
-          <p className="mt-1 text-xs text-slate-500">
-            <strong>Nội bộ:</strong> chỉ Clickstar thấy. <strong>Chia sẻ:</strong>{" "}
-            khách hàng đăng nhập thấy. <strong>Công khai:</strong> bất kỳ ai có
-            link đều xem được.
-          </p>
+          {errors.visibility ? (
+            <p className="mt-1 text-xs text-red-600">
+              {errors.visibility.message}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-500">
+              <strong>Nội bộ:</strong> chỉ Clickstar thấy.{" "}
+              <strong>Chia sẻ:</strong> khách hàng đăng nhập thấy (cần gắn
+              khách hàng). <strong>Công khai:</strong> bất kỳ ai có link đều
+              xem được.
+            </p>
+          )}
         </div>
       </div>
 
@@ -416,7 +473,7 @@ export function DocumentUploadForm({
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || !watchedCompanyId}
+              disabled={uploading}
             >
               {uploading ? (
                 <>
@@ -430,9 +487,7 @@ export function DocumentUploadForm({
                 </>
               )}
             </Button>
-            <span className="text-xs text-slate-500">
-              Tối đa 50 MB. {!watchedCompanyId && "Hãy chọn khách hàng trước."}
-            </span>
+            <span className="text-xs text-slate-500">Tối đa 50 MB.</span>
           </div>
         ) : (
           <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">

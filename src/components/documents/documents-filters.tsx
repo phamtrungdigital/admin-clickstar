@@ -20,16 +20,25 @@ import {
   DOCUMENT_VISIBILITY_LABEL,
 } from "@/lib/validation/documents";
 import type { DocumentKind, DocumentVisibility } from "@/lib/database.types";
+import type { DocumentScope } from "@/lib/queries/documents";
+
+const SCOPE_LABEL: Record<DocumentScope, string> = {
+  all: "Tất cả phạm vi",
+  internal_only: "Chỉ Nội bộ Clickstar",
+  customer: "Theo khách hàng",
+};
 
 export function DocumentsFilters({
   search,
   kind,
   visibility,
+  scope,
   canManage,
 }: {
   search: string;
   kind: DocumentKind | "all";
   visibility: DocumentVisibility | "all";
+  scope: DocumentScope;
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -60,7 +69,7 @@ export function DocumentsFilters({
   };
 
   const hasFilter =
-    q || kind !== "all" || visibility !== "all";
+    q || kind !== "all" || visibility !== "all" || scope !== "all";
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -96,6 +105,30 @@ export function DocumentsFilters({
           ))}
         </SelectContent>
       </Select>
+
+      {canManage && (
+        <Select
+          value={scope}
+          onValueChange={(v) =>
+            router.push(buildHref({ scope: v ?? undefined }))
+          }
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue>
+              {(value: string | null) =>
+                !value || value === "all"
+                  ? "Tất cả phạm vi"
+                  : SCOPE_LABEL[value as DocumentScope]
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tất cả phạm vi</SelectItem>
+            <SelectItem value="internal_only">Chỉ Nội bộ Clickstar</SelectItem>
+            <SelectItem value="customer">Theo khách hàng</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
 
       {canManage && (
         <Select

@@ -52,10 +52,49 @@ export async function createDocumentAction(
 
   const v = parsed.data;
 
+  // If a project was picked but no company, derive company from the project.
+  // Also ensures the project actually belongs to the company the user
+  // claimed (defence in depth).
+  let companyId = v.company_id;
+  if (v.project_id) {
+    const { data: project, error: pErr } = await supabase
+      .from("projects")
+      .select("company_id")
+      .eq("id", v.project_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (pErr) return { ok: false, message: pErr.message };
+    if (!project) return { ok: false, message: "Dự án không tồn tại" };
+    if (companyId && companyId !== project.company_id) {
+      return {
+        ok: false,
+        message: "Dự án không thuộc khách hàng đã chọn.",
+      };
+    }
+    companyId = project.company_id as string;
+  }
+  if (v.contract_id) {
+    const { data: contract, error: cErr } = await supabase
+      .from("contracts")
+      .select("company_id")
+      .eq("id", v.contract_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (cErr) return { ok: false, message: cErr.message };
+    if (!contract) return { ok: false, message: "Hợp đồng không tồn tại" };
+    if (companyId && companyId !== contract.company_id) {
+      return {
+        ok: false,
+        message: "Hợp đồng không thuộc khách hàng đã chọn.",
+      };
+    }
+    companyId = contract.company_id as string;
+  }
+
   const { data: doc, error } = await supabase
     .from("documents")
     .insert({
-      company_id: v.company_id,
+      company_id: companyId,
       contract_id: v.contract_id,
       project_id: v.project_id,
       ticket_id: v.ticket_id,
@@ -79,7 +118,7 @@ export async function createDocumentAction(
 
   await logAudit({
     user_id: user.id,
-    company_id: doc.company_id,
+    company_id: (doc.company_id as string | null) ?? null,
     action: "create",
     entity_type: "document",
     entity_id: doc.id,
@@ -136,7 +175,7 @@ export async function updateDocumentAction(
 
   await logAudit({
     user_id: user.id,
-    company_id: existing.company_id as string,
+    company_id: (existing.company_id as string | null) ?? null,
     action: "update",
     entity_type: "document",
     entity_id: id,
@@ -171,6 +210,24 @@ export async function setDocumentVisibilityAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
 
+  // Cross-field constraint: a document with no owning company has no
+  // specific customer to share with — block 'shared' here too (the DB
+  // CHECK constraint will also reject it).
+  const { data: existing } = await supabase
+    .from("documents")
+    .select("company_id")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) return { ok: false, message: "Tài liệu không tồn tại" };
+  if (existing.company_id === null && parsed.data.visibility === "shared") {
+    return {
+      ok: false,
+      message:
+        "Tài liệu nội bộ Clickstar không thể đặt quyền 'Chia sẻ với khách'. Hãy gắn khách hàng trước.",
+    };
+  }
+
   const { data: row, error } = await supabase
     .from("documents")
     .update({ visibility: parsed.data.visibility })
@@ -183,7 +240,7 @@ export async function setDocumentVisibilityAction(
 
   await logAudit({
     user_id: user.id,
-    company_id: row.company_id as string,
+    company_id: (row.company_id as string | null) ?? null,
     action: "update",
     entity_type: "document",
     entity_id: id,
@@ -221,7 +278,7 @@ export async function softDeleteDocumentAction(
 
   await logAudit({
     user_id: user.id,
-    company_id: row.company_id as string,
+    company_id: (row.company_id as string | null) ?? null,
     action: "delete",
     entity_type: "document",
     entity_id: id,

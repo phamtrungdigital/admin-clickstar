@@ -10,10 +10,15 @@ export type DocumentListItem = DocumentRow & {
   uploader: { id: string; full_name: string } | null;
 };
 
+/** "internal_only" matches documents with company_id IS NULL
+ *  (Clickstar-internal). "customer" matches documents with a company. */
+export type DocumentScope = "all" | "internal_only" | "customer";
+
 export type DocumentListParams = {
   search?: string;
   kind?: DocumentKind | "all";
   visibility?: DocumentVisibility | "all";
+  scope?: DocumentScope;
   company_id?: string;
   project_id?: string;
   contract_id?: string;
@@ -64,6 +69,11 @@ export async function listDocuments(
   }
   if (params.visibility && params.visibility !== "all") {
     query = query.eq("visibility", params.visibility);
+  }
+  if (params.scope === "internal_only") {
+    query = query.is("company_id", null);
+  } else if (params.scope === "customer") {
+    query = query.not("company_id", "is", null);
   }
   if (params.company_id) query = query.eq("company_id", params.company_id);
   if (params.project_id) query = query.eq("project_id", params.project_id);

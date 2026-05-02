@@ -98,6 +98,7 @@ export async function ProjectDocumentsSection({
                 documentId={d.id}
                 visibility={d.visibility}
                 canManage={canManage}
+                companyName={d.company?.name ?? null}
               />
             </li>
           ))}

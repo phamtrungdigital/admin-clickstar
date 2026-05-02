@@ -30,10 +30,14 @@ export function DocumentRowActions({
   documentId,
   visibility,
   canManage,
+  companyName,
 }: {
   documentId: string;
   visibility: DocumentVisibility;
   canManage: boolean;
+  /** Used in the share-confirm prompt. Null = no owning company,
+   *  in which case the share action is disabled. */
+  companyName?: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -57,6 +61,20 @@ export function DocumentRowActions({
   const onToggleShare = () => {
     const next: DocumentVisibility =
       visibility === "shared" ? "internal" : "shared";
+
+    if (next === "shared") {
+      if (!companyName) {
+        toast.error(
+          "Tài liệu này chưa gắn khách hàng. Mở trang chi tiết để gán khách trước.",
+        );
+        return;
+      }
+      const ok = window.confirm(
+        `Khách hàng "${companyName}" sẽ thấy tài liệu này trong portal của họ. Tiếp tục?`,
+      );
+      if (!ok) return;
+    }
+
     startTransition(async () => {
       const result = await setDocumentVisibilityAction(documentId, {
         visibility: next,

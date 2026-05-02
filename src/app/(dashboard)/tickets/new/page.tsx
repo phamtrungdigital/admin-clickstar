@@ -5,7 +5,12 @@ import { listInternalStaff } from "@/lib/queries/customers";
 
 export const metadata = { title: "Thêm ticket | Portal.Clickstar.vn" };
 
-export default async function NewTicketPage() {
+export default async function NewTicketPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ company?: string }>;
+}) {
+  const sp = await searchParams;
   const [companies, staff] = await Promise.all([
     listActiveCompaniesForSelect().catch(() => []),
     listInternalStaff().catch(() => []),
@@ -22,7 +27,12 @@ export default async function NewTicketPage() {
           { label: "Thêm ticket" },
         ]}
       />
-      <TicketForm mode="create" companies={companies} staff={staff} />
+      <TicketForm
+        mode="create"
+        companies={companies}
+        staff={staff}
+        defaultValues={sp.company ? { company_id: sp.company } : undefined}
+      />
     </div>
   );
 }

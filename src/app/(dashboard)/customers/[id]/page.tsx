@@ -26,10 +26,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCustomerById, listCompanyMembers } from "@/lib/queries/customers";
 import { listContracts } from "@/lib/queries/contracts";
 import { listProjects } from "@/lib/queries/projects";
+import { listDocuments } from "@/lib/queries/documents";
+import { listTickets } from "@/lib/queries/tickets";
 import { MembersTab } from "@/components/customers/members-tab";
 import {
   CONTRACT_STATUS_OPTIONS,
 } from "@/lib/validation/contracts";
+import {
+  DOCUMENT_KIND_LABEL,
+  DOCUMENT_VISIBILITY_LABEL,
+} from "@/lib/validation/documents";
+import {
+  TICKET_PRIORITY_OPTIONS,
+  TICKET_STATUS_OPTIONS,
+} from "@/lib/validation/tickets";
+import { DocumentRowActions } from "@/components/documents/document-row-actions";
 
 export const metadata = { title: "Chi tiết khách hàng | Portal.Clickstar.vn" };
 
@@ -42,7 +53,13 @@ export default async function CustomerDetailPage({
 
   const customer = await getCustomerById(id).catch(() => null);
   if (!customer) notFound();
-  const [members, contractsResult, projectsResult] = await Promise.all([
+  const [
+    members,
+    contractsResult,
+    projectsResult,
+    documentsResult,
+    ticketsResult,
+  ] = await Promise.all([
     listCompanyMembers(customer.id).catch(() => []),
     listContracts({ company_id: customer.id, pageSize: 50 }).catch(() => ({
       rows: [],
@@ -56,9 +73,23 @@ export default async function CustomerDetailPage({
       page: 1,
       pageSize: 50,
     })),
+    listDocuments({ company_id: customer.id, pageSize: 50 }).catch(() => ({
+      rows: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    })),
+    listTickets({ company_id: customer.id, pageSize: 50 }).catch(() => ({
+      rows: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    })),
   ]);
   const contracts = contractsResult.rows;
   const projects = projectsResult.rows;
+  const documents = documentsResult.rows;
+  const tickets = ticketsResult.rows;
 
   return (
     <div className="space-y-6">
@@ -115,8 +146,14 @@ export default async function CustomerDetailPage({
                 {projects.length > 0 && ` (${projects.length})`}
               </TabsTrigger>
               <TabsTrigger value="services">Dịch vụ</TabsTrigger>
-              <TabsTrigger value="documents">Tài liệu</TabsTrigger>
-              <TabsTrigger value="tickets">Ticket</TabsTrigger>
+              <TabsTrigger value="documents">
+                Tài liệu
+                {documents.length > 0 && ` (${documents.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="tickets">
+                Ticket
+                {tickets.length > 0 && ` (${tickets.length})`}
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="info" className="mt-4">
               <InfoCard customer={customer} />
@@ -134,10 +171,14 @@ export default async function CustomerDetailPage({
               <ServicesTab services={customer.services} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ComingSoonTab title="Tài liệu" icon={FolderOpen} phase="2" />
+              <DocumentsTab companyId={customer.id} documents={documents} />
             </TabsContent>
             <TabsContent value="tickets" className="mt-4">
-              <ComingSoonTab title="Ticket" icon={Ticket} phase="2" />
+              <TicketsTab
+                companyId={customer.id}
+                companyName={customer.name}
+                tickets={tickets}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -457,6 +498,183 @@ function ProjectsTab({
       )}
     </div>
   );
+}
+
+function DocumentsTab({
+  companyId,
+  documents,
+}: {
+  companyId: string;
+  documents: Awaited<ReturnType<typeof listDocuments>>["rows"];
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-900">
+          Tài liệu của khách hàng này
+        </h3>
+        <Link
+          href={`/documents/new?company=${companyId}`}
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "bg-blue-600 text-white hover:bg-blue-700",
+          )}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Upload tài liệu
+        </Link>
+      </div>
+
+      {documents.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center">
+          <FolderOpen className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="mt-2 text-sm text-slate-500">
+            Chưa có tài liệu cho khách hàng này.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {documents.map((d) => (
+            <li
+              key={d.id}
+              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+            >
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-slate-100">
+                <FolderOpen className="h-4 w-4 text-slate-500" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/documents/${d.id}`}
+                  className="block truncate text-sm font-medium text-slate-900 hover:text-blue-700"
+                >
+                  {d.name}
+                </Link>
+                <p className="text-xs text-slate-500">
+                  {DOCUMENT_KIND_LABEL[d.kind]} ·{" "}
+                  {format(new Date(d.created_at), "dd/MM/yyyy")}
+                  {d.size_bytes ? ` · ${formatBytes(d.size_bytes)}` : ""}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                  d.visibility === "shared" &&
+                    "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                  d.visibility === "public" &&
+                    "bg-blue-50 text-blue-700 ring-blue-200",
+                  d.visibility === "internal" &&
+                    "bg-slate-100 text-slate-700 ring-slate-200",
+                )}
+              >
+                {DOCUMENT_VISIBILITY_LABEL[d.visibility]}
+              </span>
+              <DocumentRowActions
+                documentId={d.id}
+                visibility={d.visibility}
+                canManage
+                companyName={d.company?.name ?? null}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TicketsTab({
+  companyId,
+  companyName,
+  tickets,
+}: {
+  companyId: string;
+  companyName: string;
+  tickets: Awaited<ReturnType<typeof listTickets>>["rows"];
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-900">
+          Ticket của khách hàng này
+        </h3>
+        <Link
+          href={`/tickets/new?company=${companyId}`}
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "bg-blue-600 text-white hover:bg-blue-700",
+          )}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Tạo ticket
+        </Link>
+      </div>
+
+      {tickets.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center">
+          <Ticket className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="mt-2 text-sm text-slate-500">
+            {companyName} chưa có ticket nào.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {tickets.map((t) => {
+            const statusOpt = TICKET_STATUS_OPTIONS.find(
+              (o) => o.value === t.status,
+            );
+            const priorityOpt = TICKET_PRIORITY_OPTIONS.find(
+              (o) => o.value === t.priority,
+            );
+            return (
+              <li
+                key={t.id}
+                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-slate-100">
+                  <Ticket className="h-4 w-4 text-slate-500" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/tickets/${t.id}`}
+                    className="block truncate text-sm font-medium text-slate-900 hover:text-blue-700"
+                  >
+                    {t.title}
+                  </Link>
+                  <p className="text-xs text-slate-500">
+                    {t.code ? `${t.code} · ` : ""}
+                    {priorityOpt?.label ?? t.priority}
+                    {" · "}
+                    {format(new Date(t.created_at), "dd/MM/yyyy")}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                    t.status === "new" &&
+                      "bg-blue-50 text-blue-700 ring-blue-200",
+                    t.status === "in_progress" &&
+                      "bg-amber-50 text-amber-700 ring-amber-200",
+                    t.status === "awaiting_customer" &&
+                      "bg-violet-50 text-violet-700 ring-violet-200",
+                    t.status === "resolved" &&
+                      "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                    t.status === "closed" &&
+                      "bg-slate-100 text-slate-700 ring-slate-200",
+                  )}
+                >
+                  {statusOpt?.label ?? t.status}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function ServicesTab({

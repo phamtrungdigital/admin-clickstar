@@ -4,10 +4,12 @@ import {
   listActiveServicesGrouped,
   listInternalStaff,
 } from "@/lib/queries/customers";
+import { requireInternalPage, canManageCustomers } from "@/lib/auth/guards";
 
 export const metadata = { title: "Thêm khách hàng | Portal.Clickstar.vn" };
 
 export default async function NewCustomerPage() {
+  const profile = await requireInternalPage();
   const [staff, services] = await Promise.all([
     listInternalStaff().catch(() => []),
     listActiveServicesGrouped().catch(() => []),
@@ -24,7 +26,13 @@ export default async function NewCustomerPage() {
           { label: "Thêm khách hàng" },
         ]}
       />
-      <CustomerForm mode="create" staff={staff} services={services} />
+      <CustomerForm
+        mode="create"
+        staff={staff}
+        services={services}
+        currentUserId={profile.id}
+        canChooseManager={canManageCustomers(profile)}
+      />
     </div>
   );
 }

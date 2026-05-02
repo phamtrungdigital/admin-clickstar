@@ -249,6 +249,14 @@ function SidePanel({ customer }: { customer: Awaited<ReturnType<typeof getCustom
       <SidePanelCard title="Cập nhật">
         <dl className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
+            <dt className="text-slate-500">Người tạo</dt>
+            <dd className="text-slate-800">
+              {customer.creator?.full_name ?? (
+                <span className="text-slate-400">—</span>
+              )}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between">
             <dt className="text-slate-500">Tạo lúc</dt>
             <dd className="text-slate-800">
               {format(new Date(customer.created_at), "dd/MM/yyyy HH:mm")}

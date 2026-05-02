@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireInternalAction } from "@/lib/auth/guards";
+import { requireInternalAction, canManageCustomers } from "@/lib/auth/guards";
 import {
   createCompanySchema,
   normalizeCompanyInput,
@@ -47,8 +47,16 @@ export async function createCustomerAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
 
-  const { primary_account_manager_id, service_ids, ...rest } = parsed.data;
+  const { primary_account_manager_id: requestedAm, service_ids, ...rest } =
+    parsed.data;
   const payload = normalizeCompanyInput(rest);
+
+  // Defence-in-depth: only manager/admin/super_admin can pick someone
+  // else as Account Manager. Staff/support/accountant always become the
+  // AM themselves regardless of what the form posts.
+  const primary_account_manager_id = canManageCustomers(guard.profile)
+    ? requestedAm
+    : user.id;
 
   const { data: company, error } = await supabase
     .from("companies")
@@ -128,7 +136,8 @@ export async function updateCustomerAction(
   }
 
   const supabase = await createClient();
-  const { primary_account_manager_id, service_ids, ...rest } = parsed.data;
+  const { primary_account_manager_id: requestedAm, service_ids, ...rest } =
+    parsed.data;
   const payload = normalizeCompanyInput(rest);
 
   if (Object.keys(payload).length > 0) {
@@ -138,6 +147,13 @@ export async function updateCustomerAction(
       .eq("id", id);
     if (error) return { ok: false, message: error.message };
   }
+
+  // Lower-tier roles cannot reassign the AM — silently ignore the field
+  // even if it came through the form (which currently disables it). They
+  // can still update the rest of the customer's data.
+  const primary_account_manager_id = canManageCustomers(guard.profile)
+    ? requestedAm
+    : undefined;
 
   if (primary_account_manager_id !== undefined) {
     // Replace any existing primary account manager assignment

@@ -46,6 +46,12 @@ export type CustomerFormProps = {
   defaultValues?: Partial<CreateCompanyInput>;
   staff: Array<{ id: string; full_name: string; internal_role: string | null }>;
   services: ServicePickOption[];
+  /** Current user id — used as the default Account Manager when the user
+   *  doesn't have manager+ rights to pick someone else. */
+  currentUserId: string;
+  /** Manager / admin / super_admin can pick any AM. Staff / support /
+   *  accountant get the field locked to themselves. */
+  canChooseManager: boolean;
 };
 
 export function CustomerForm({
@@ -54,6 +60,8 @@ export function CustomerForm({
   defaultValues,
   staff,
   services,
+  currentUserId,
+  canChooseManager,
 }: CustomerFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -77,8 +85,11 @@ export function CustomerForm({
       phone: defaultValues?.phone ?? "",
       address: defaultValues?.address ?? "",
       tax_code: defaultValues?.tax_code ?? "",
+      // Auto-fill the AM with the current user when nothing is set yet.
+      // Manager+ can change it freely; staff/support/accountant get the
+      // dropdown locked below.
       primary_account_manager_id:
-        defaultValues?.primary_account_manager_id ?? null,
+        defaultValues?.primary_account_manager_id ?? currentUserId,
       service_ids: defaultValues?.service_ids ?? [],
     },
   });
@@ -232,6 +243,7 @@ export function CustomerForm({
               <Select
                 value={field.value ?? NO_MANAGER}
                 onValueChange={(v) => field.onChange(v === NO_MANAGER ? null : v)}
+                disabled={!canChooseManager}
               >
                 <SelectTrigger className="w-full max-w-md">
                   <SelectValue placeholder="Chưa phân công">
@@ -253,6 +265,12 @@ export function CustomerForm({
               </Select>
             )}
           />
+          {!canChooseManager && (
+            <p className="mt-1.5 text-xs text-slate-500">
+              Bạn được mặc định là Account Manager của khách hàng này. Nếu cần
+              chuyển người phụ trách, hãy liên hệ Manager hoặc Admin.
+            </p>
+          )}
         </Field>
       </FormSection>
 

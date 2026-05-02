@@ -14,6 +14,20 @@ export function isInternal(profile: ProfileRow | null): profile is ProfileRow {
   return profile?.audience === "internal";
 }
 
+/** Manager-or-above internal roles: have authority to assign Account
+ *  Managers, override AM picks made by lower-tier staff, and edit
+ *  cross-team data. Staff / support / accountant cannot. */
+export function canManageCustomers(
+  profile: ProfileRow | null,
+): profile is ProfileRow {
+  if (!isInternal(profile)) return false;
+  return (
+    profile.internal_role === "super_admin"
+    || profile.internal_role === "admin"
+    || profile.internal_role === "manager"
+  );
+}
+
 /**
  * For Server Actions: returns the profile when the caller is internal,
  * otherwise an `{ ok: false, message }` shape that actions can return

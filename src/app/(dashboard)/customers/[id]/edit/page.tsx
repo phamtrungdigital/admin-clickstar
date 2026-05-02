@@ -7,6 +7,7 @@ import {
   listActiveServicesGrouped,
   listInternalStaff,
 } from "@/lib/queries/customers";
+import { requireInternalPage, canManageCustomers } from "@/lib/auth/guards";
 
 export const metadata = { title: "Sửa khách hàng | Portal.Clickstar.vn" };
 
@@ -16,6 +17,7 @@ export default async function EditCustomerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const profile = await requireInternalPage();
   const [customer, staff, services] = await Promise.all([
     getCustomerById(id).catch(() => null),
     listInternalStaff().catch(() => []),
@@ -55,6 +57,8 @@ export default async function EditCustomerPage({
         }}
         staff={staff}
         services={services}
+        currentUserId={profile.id}
+        canChooseManager={canManageCustomers(profile)}
       />
     </div>
   );

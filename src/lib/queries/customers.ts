@@ -120,6 +120,8 @@ export async function getCustomerStats(): Promise<CustomerStats> {
 
 export type CustomerDetail = CompanyRow & {
   primary_account_manager: { id: string; full_name: string } | null;
+  /** Profile of the user who initially inserted the customer row. */
+  creator: { id: string; full_name: string } | null;
   assignments: Array<{
     id: string;
     role: string;
@@ -137,6 +139,10 @@ export async function getCustomerById(id: string): Promise<CustomerDetail | null
     .select(
       `
       *,
+      creator:profiles!companies_created_by_fkey (
+        id,
+        full_name
+      ),
       assignments:company_assignments!company_assignments_company_id_fkey (
         id,
         role,
@@ -183,19 +189,27 @@ export async function getCustomerById(id: string): Promise<CustomerDetail | null
     .map((l) => l.service)
     .filter((s): s is { id: string; name: string; category: string | null } => !!s);
 
+  const creator =
+    (data as { creator?: { id: string; full_name: string } | null }).creator ??
+    null;
+
   const {
     assignments: _drop1,
     company_services: _drop2,
+    creator: _drop3,
     ...rest
   } = data as CompanyRow & {
     assignments?: Assignment[];
     company_services?: ServiceLink[];
+    creator?: { id: string; full_name: string } | null;
   };
   void _drop1;
   void _drop2;
+  void _drop3;
   return {
     ...(rest as CompanyRow),
     primary_account_manager: primary?.manager ?? null,
+    creator,
     assignments,
     service_ids: services.map((s) => s.id),
     services,

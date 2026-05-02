@@ -103,48 +103,6 @@ export function SettingsForm({ initial, canEdit }: SettingsFormProps) {
       </FormSection>
 
       <FormSection
-        title="Mặc định kinh doanh"
-        description="Pre-fill khi tạo hợp đồng mới — vẫn override được cho từng hợp đồng."
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label="VAT mặc định (%)"
-            error={errors.businessDefaultVat?.message}
-          >
-            <Controller
-              control={control}
-              name="businessDefaultVat"
-              render={({ field }) => (
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  min={0}
-                  max={100}
-                  value={field.value}
-                  onChange={(e) =>
-                    field.onChange(e.target.valueAsNumber || 0)
-                  }
-                  onBlur={field.onBlur}
-                  disabled={!canEdit}
-                />
-              )}
-            />
-          </Field>
-          <Field
-            label="Đơn vị tiền tệ"
-            error={errors.businessDefaultCurrency?.message}
-          >
-            <Input
-              {...register("businessDefaultCurrency")}
-              disabled={!canEdit}
-              placeholder="VND"
-            />
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection
         title="Thông báo"
         description="Bật/tắt kênh gửi tự động cho thông báo hệ thống."
       >

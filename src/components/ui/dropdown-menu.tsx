@@ -57,11 +57,16 @@ function DropdownMenuLabel({
   className,
   inset,
   ...props
-}: MenuPrimitive.GroupLabel.Props & {
+}: React.ComponentProps<"div"> & {
   inset?: boolean
 }) {
+  // NOTE: Renders a plain <div> on purpose. Base UI's MenuPrimitive.GroupLabel
+  // requires a parent <Menu.Group> context (else it throws "MenuGroupRootContext
+  // is missing"), which crashed the dropdown when used as a section header
+  // (user-menu, ticket-row-menu). Existing call sites use this for visual
+  // headings — not for a11y group labels — so a div is the right primitive.
   return (
-    <MenuPrimitive.GroupLabel
+    <div
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(

@@ -28,39 +28,103 @@ export type NavItem = {
   children?: NavItem[];
 };
 
+// Role bundles — match PRD §3:
+//   Manager+   = super_admin · admin · manager (full ops + admin views)
+//   Doer       = + staff (triển khai, công việc)
+//   CS-aware   = + support (CSKH cần thấy khách + ticket + tài liệu)
+//   Money-aware = + accountant (kế toán xem hợp đồng + tài liệu + báo cáo)
+const ROLES_MANAGER_PLUS: InternalRole[] = ["super_admin", "admin", "manager"];
+const ROLES_OPS: InternalRole[] = ["super_admin", "admin", "manager", "staff"];
+const ROLES_TICKET: InternalRole[] = [
+  "super_admin",
+  "admin",
+  "manager",
+  "staff",
+  "support",
+];
+const ROLES_CONTRACT: InternalRole[] = [
+  "super_admin",
+  "admin",
+  "manager",
+  "staff",
+  "accountant",
+];
+const ROLES_ADMIN_ONLY: InternalRole[] = ["super_admin", "admin"];
+
 export const internalNav: NavItem[] = [
   { label: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  // Khách hàng: mọi role thấy (CSKH cần list khách, kế toán cần xem để gắn HĐ)
   { label: "Khách hàng", href: "/customers", icon: Users },
-  { label: "Hợp đồng", href: "/contracts", icon: FileSignature },
-  { label: "Dự án", href: "/projects", icon: FolderKanban },
-  { label: "Dịch vụ", href: "/services", icon: Package },
-  { label: "Template", href: "/templates", icon: ListTree },
+  // Hợp đồng: bỏ support (PRD §3 — support chỉ xem khách + ticket)
+  {
+    label: "Hợp đồng",
+    href: "/contracts",
+    icon: FileSignature,
+    allowedRoles: ROLES_CONTRACT,
+  },
+  // Dự án: bỏ support + accountant — chỉ team triển khai
+  {
+    label: "Dự án",
+    href: "/projects",
+    icon: FolderKanban,
+    allowedRoles: ROLES_OPS,
+  },
+  // Dịch vụ + Template: dữ liệu cấu hình hệ thống — chỉ manager+
+  {
+    label: "Dịch vụ",
+    href: "/services",
+    icon: Package,
+    allowedRoles: ROLES_MANAGER_PLUS,
+  },
+  {
+    label: "Template",
+    href: "/templates",
+    icon: ListTree,
+    allowedRoles: ROLES_MANAGER_PLUS,
+  },
   {
     label: "Vận hành",
     href: "/tasks",
     icon: ListChecks,
     children: [
-      { label: "Công việc", href: "/tasks", icon: ListChecks },
-      { label: "Ticket", href: "/tickets", icon: Ticket },
+      // Công việc: bỏ support + accountant
+      {
+        label: "Công việc",
+        href: "/tasks",
+        icon: ListChecks,
+        allowedRoles: ROLES_OPS,
+      },
+      // Ticket: bỏ accountant
+      {
+        label: "Ticket",
+        href: "/tickets",
+        icon: Ticket,
+        allowedRoles: ROLES_TICKET,
+      },
+      // Tài liệu: mọi role thấy (kế toán cần file HĐ, support cần file KH)
       { label: "Tài liệu", href: "/documents", icon: FolderOpen },
     ],
   },
+  // Marketing & Automation: cấu hình kênh gửi — chỉ manager+
   {
     label: "Marketing & Automation",
     href: "/email",
     icon: Workflow,
+    allowedRoles: ROLES_MANAGER_PLUS,
     children: [
       { label: "Email Marketing", href: "/email", icon: Mail },
       { label: "ZNS", href: "/zns", icon: MessageSquare },
       { label: "Automation", href: "/automation", icon: Workflow },
     ],
   },
+  // Báo cáo: mọi role thấy (kế toán cần báo cáo công nợ sau này, support cần
+  // báo cáo ticket xử lý...)
   { label: "Báo cáo", href: "/reports", icon: BarChart3 },
   {
     label: "Quản trị hệ thống",
     href: "/admin",
     icon: ShieldUser,
-    allowedRoles: ["super_admin", "admin"],
+    allowedRoles: ROLES_ADMIN_ONLY,
     children: [
       { label: "Người dùng", href: "/admin/users", icon: Users },
       { label: "Vai trò & Phân quyền", href: "/admin/roles", icon: ShieldUser },

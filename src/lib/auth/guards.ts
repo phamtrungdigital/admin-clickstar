@@ -28,6 +28,32 @@ export function canManageCustomers(
   );
 }
 
+/** Contracts contain financial info (value, VAT) — staff "only follow
+ *  customers, not contracts" per anh's 2026-05-02 decision. Customers
+ *  always see their own contracts. Internal: manager+ and accountant
+ *  only. Mirrors ROLES_CONTRACT in nav-config.ts.  */
+export function canSeeContracts(profile: ProfileRow | null): boolean {
+  if (!profile) return false;
+  if (profile.audience === "customer") return true;
+  if (!isInternal(profile)) return false;
+  return (
+    profile.internal_role === "super_admin"
+    || profile.internal_role === "admin"
+    || profile.internal_role === "manager"
+    || profile.internal_role === "accountant"
+  );
+}
+
+/** Page-level guard for /contracts/* — fail fast (redirect /dashboard)
+ *  instead of letting RLS return empty rows that would confuse the user. */
+export async function requireContractAccess(): Promise<ProfileRow> {
+  const { profile } = await getCurrentUser();
+  if (!canSeeContracts(profile)) {
+    redirect("/dashboard");
+  }
+  return profile!;
+}
+
 /**
  * For Server Actions: returns the profile when the caller is internal,
  * otherwise an `{ ok: false, message }` shape that actions can return

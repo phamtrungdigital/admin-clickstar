@@ -42,11 +42,12 @@ const ROLES_TICKET: InternalRole[] = [
   "staff",
   "support",
 ];
+// Hợp đồng chứa thông tin tài chính nhạy cảm (giá trị, VAT...). Staff
+// "follow khách hàng" thôi, không cần xem hợp đồng — anh chốt 2026-05-02.
 const ROLES_CONTRACT: InternalRole[] = [
   "super_admin",
   "admin",
   "manager",
-  "staff",
   "accountant",
 ];
 const ROLES_ADMIN_ONLY: InternalRole[] = ["super_admin", "admin"];

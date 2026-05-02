@@ -41,6 +41,8 @@ import {
   TICKET_STATUS_OPTIONS,
 } from "@/lib/validation/tickets";
 import { DocumentRowActions } from "@/components/documents/document-row-actions";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { canSeeContracts } from "@/lib/auth/guards";
 
 export const metadata = { title: "Chi tiết khách hàng | Portal.Clickstar.vn" };
 
@@ -53,6 +55,10 @@ export default async function CustomerDetailPage({
 
   const customer = await getCustomerById(id).catch(() => null);
   if (!customer) notFound();
+  const { profile } = await getCurrentUser();
+  const showContracts = canSeeContracts(profile);
+
+  const emptyResult = { rows: [], total: 0, page: 1, pageSize: 50 };
   const [
     members,
     contractsResult,
@@ -61,30 +67,22 @@ export default async function CustomerDetailPage({
     ticketsResult,
   ] = await Promise.all([
     listCompanyMembers(customer.id).catch(() => []),
-    listContracts({ company_id: customer.id, pageSize: 50 }).catch(() => ({
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 50,
-    })),
-    listProjects({ company_id: customer.id, pageSize: 50 }).catch(() => ({
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 50,
-    })),
-    listDocuments({ company_id: customer.id, pageSize: 50 }).catch(() => ({
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 50,
-    })),
-    listTickets({ company_id: customer.id, pageSize: 50 }).catch(() => ({
-      rows: [],
-      total: 0,
-      page: 1,
-      pageSize: 50,
-    })),
+    // Skip the contract roundtrip entirely when staff/support — they
+    // don't see the tab, no point asking RLS to filter rows out.
+    showContracts
+      ? listContracts({ company_id: customer.id, pageSize: 50 }).catch(
+          () => emptyResult,
+        )
+      : Promise.resolve(emptyResult),
+    listProjects({ company_id: customer.id, pageSize: 50 }).catch(
+      () => emptyResult,
+    ),
+    listDocuments({ company_id: customer.id, pageSize: 50 }).catch(
+      () => emptyResult,
+    ),
+    listTickets({ company_id: customer.id, pageSize: 50 }).catch(
+      () => emptyResult,
+    ),
   ]);
   const contracts = contractsResult.rows;
   const projects = projectsResult.rows;
@@ -137,10 +135,12 @@ export default async function CustomerDetailPage({
             <TabsList className="bg-white border border-slate-200 p-1">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
               <TabsTrigger value="members">Tài khoản</TabsTrigger>
-              <TabsTrigger value="contracts">
-                Hợp đồng
-                {contracts.length > 0 && ` (${contracts.length})`}
-              </TabsTrigger>
+              {showContracts && (
+                <TabsTrigger value="contracts">
+                  Hợp đồng
+                  {contracts.length > 0 && ` (${contracts.length})`}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="projects">
                 Dự án
                 {projects.length > 0 && ` (${projects.length})`}
@@ -161,9 +161,11 @@ export default async function CustomerDetailPage({
             <TabsContent value="members" className="mt-4">
               <MembersTab companyId={customer.id} members={members} />
             </TabsContent>
-            <TabsContent value="contracts" className="mt-4">
-              <ContractsTab companyId={customer.id} contracts={contracts} />
-            </TabsContent>
+            {showContracts && (
+              <TabsContent value="contracts" className="mt-4">
+                <ContractsTab companyId={customer.id} contracts={contracts} />
+              </TabsContent>
+            )}
             <TabsContent value="projects" className="mt-4">
               <ProjectsTab projects={projects} />
             </TabsContent>

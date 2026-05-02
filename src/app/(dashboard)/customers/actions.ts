@@ -204,6 +204,15 @@ export async function updateCustomerAction(
 export async function softDeleteCustomerAction(id: string): Promise<ActionResult> {
   const guard = await requireInternalAction();
   if (!guard.ok) return { ok: false, message: guard.message };
+  // Soft-delete is sensitive — restrict to manager/admin/super_admin even
+  // though RLS would let any internal UPDATE companies they can access.
+  if (!canManageCustomers(guard.profile)) {
+    return {
+      ok: false,
+      message:
+        "Bạn không có quyền xoá khách hàng. Vui lòng liên hệ Manager hoặc Admin.",
+    };
+  }
   const supabase = await createClient();
   const {
     data: { user },

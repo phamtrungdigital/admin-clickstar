@@ -5,12 +5,14 @@ import {
   Building2,
   ExternalLink,
   FileSignature,
+  FolderKanban,
   FolderOpen,
   Mail,
   MapPin,
   Package,
   Pencil,
   Phone,
+  Plus,
   Receipt,
   Ticket,
   User,
@@ -22,7 +24,12 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CompanyStatusBadge } from "@/components/dashboard/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCustomerById, listCompanyMembers } from "@/lib/queries/customers";
+import { listContracts } from "@/lib/queries/contracts";
+import { listProjects } from "@/lib/queries/projects";
 import { MembersTab } from "@/components/customers/members-tab";
+import {
+  CONTRACT_STATUS_OPTIONS,
+} from "@/lib/validation/contracts";
 
 export const metadata = { title: "Chi tiết khách hàng | Portal.Clickstar.vn" };
 
@@ -35,7 +42,23 @@ export default async function CustomerDetailPage({
 
   const customer = await getCustomerById(id).catch(() => null);
   if (!customer) notFound();
-  const members = await listCompanyMembers(customer.id).catch(() => []);
+  const [members, contractsResult, projectsResult] = await Promise.all([
+    listCompanyMembers(customer.id).catch(() => []),
+    listContracts({ company_id: customer.id, pageSize: 50 }).catch(() => ({
+      rows: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    })),
+    listProjects({ company_id: customer.id, pageSize: 50 }).catch(() => ({
+      rows: [],
+      total: 0,
+      page: 1,
+      pageSize: 50,
+    })),
+  ]);
+  const contracts = contractsResult.rows;
+  const projects = projectsResult.rows;
 
   return (
     <div className="space-y-6">
@@ -83,7 +106,14 @@ export default async function CustomerDetailPage({
             <TabsList className="bg-white border border-slate-200 p-1">
               <TabsTrigger value="info">Thông tin</TabsTrigger>
               <TabsTrigger value="members">Tài khoản</TabsTrigger>
-              <TabsTrigger value="contracts">Hợp đồng</TabsTrigger>
+              <TabsTrigger value="contracts">
+                Hợp đồng
+                {contracts.length > 0 && ` (${contracts.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="projects">
+                Dự án
+                {projects.length > 0 && ` (${projects.length})`}
+              </TabsTrigger>
               <TabsTrigger value="services">Dịch vụ</TabsTrigger>
               <TabsTrigger value="documents">Tài liệu</TabsTrigger>
               <TabsTrigger value="tickets">Ticket</TabsTrigger>
@@ -95,7 +125,10 @@ export default async function CustomerDetailPage({
               <MembersTab companyId={customer.id} members={members} />
             </TabsContent>
             <TabsContent value="contracts" className="mt-4">
-              <ComingSoonTab title="Hợp đồng" icon={FileSignature} phase="2" />
+              <ContractsTab companyId={customer.id} contracts={contracts} />
+            </TabsContent>
+            <TabsContent value="projects" className="mt-4">
+              <ProjectsTab projects={projects} />
             </TabsContent>
             <TabsContent value="services" className="mt-4">
               <ServicesTab services={customer.services} />
@@ -285,6 +318,143 @@ function SidePanelCard({
     <div className="rounded-xl border border-slate-200 bg-white p-5">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function ContractsTab({
+  companyId,
+  contracts,
+}: {
+  companyId: string;
+  contracts: Awaited<ReturnType<typeof listContracts>>["rows"];
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-900">
+          Hợp đồng của khách hàng này
+        </h3>
+        <Link
+          href={`/contracts/new?company=${companyId}`}
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "bg-blue-600 text-white hover:bg-blue-700",
+          )}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Thêm hợp đồng
+        </Link>
+      </div>
+
+      {contracts.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center">
+          <FileSignature className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="mt-2 text-sm text-slate-500">
+            Chưa có hợp đồng nào với khách hàng này.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {contracts.map((c) => {
+            const statusOpt = CONTRACT_STATUS_OPTIONS.find(
+              (o) => o.value === c.status,
+            );
+            return (
+              <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-slate-100">
+                  <FileSignature className="h-4 w-4 text-slate-500" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/contracts/${c.id}`}
+                    className="block truncate text-sm font-medium text-slate-900 hover:text-blue-700"
+                  >
+                    {c.name}
+                  </Link>
+                  <p className="text-xs text-slate-500">
+                    {c.code ? `${c.code} · ` : ""}
+                    {c.service_count} dịch vụ
+                    {c.signed_at
+                      ? ` · ký ${format(new Date(c.signed_at), "dd/MM/yyyy")}`
+                      : ""}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                    statusOpt?.tone === "blue" && "bg-blue-50 text-blue-700 ring-blue-200",
+                    statusOpt?.tone === "amber" && "bg-amber-50 text-amber-700 ring-amber-200",
+                    statusOpt?.tone === "emerald" && "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                    statusOpt?.tone === "rose" && "bg-rose-50 text-rose-700 ring-rose-200",
+                    (!statusOpt || statusOpt.tone === "slate") &&
+                      "bg-slate-100 text-slate-700 ring-slate-200",
+                  )}
+                >
+                  {statusOpt?.label ?? c.status}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ProjectsTab({
+  projects,
+}: {
+  projects: Awaited<ReturnType<typeof listProjects>>["rows"];
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-slate-900">
+          Dự án của khách hàng này
+        </h3>
+        <p className="text-xs text-slate-500">
+          Để thêm dự án mới, mở hợp đồng tương ứng và bấm “Triển khai từ
+          template”.
+        </p>
+      </div>
+
+      {projects.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-200 px-4 py-10 text-center">
+          <FolderKanban className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="mt-2 text-sm text-slate-500">
+            Chưa có dự án nào.
+          </p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {projects.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+            >
+              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-slate-100">
+                <FolderKanban className="h-4 w-4 text-slate-500" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="block truncate text-sm font-medium text-slate-900 hover:text-blue-700"
+                >
+                  {p.name}
+                </Link>
+                <p className="text-xs text-slate-500">
+                  {p.contract?.name ? `${p.contract.name} · ` : ""}
+                  {p.task_count} task
+                  {p.template ? ` · template ${p.template.name}` : ""}
+                </p>
+              </div>
+              <span className="text-xs font-medium text-slate-600">
+                {p.progress_percent ?? 0}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

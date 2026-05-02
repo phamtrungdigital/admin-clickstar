@@ -9,7 +9,12 @@ import type { TemplateOption } from "@/components/contracts/contract-services-ed
 
 export const metadata = { title: "Thêm hợp đồng | Portal.Clickstar.vn" };
 
-export default async function NewContractPage() {
+export default async function NewContractPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ company?: string }>;
+}) {
+  const sp = await searchParams;
   const [companies, services, templates] = await Promise.all([
     listActiveCompaniesForSelect().catch(() => []),
     listActiveServicesForSelect().catch(() => []),
@@ -32,6 +37,7 @@ export default async function NewContractPage() {
         companies={companies}
         services={services}
         templates={templates}
+        defaultValues={sp.company ? { company_id: sp.company } : undefined}
       />
     </div>
   );

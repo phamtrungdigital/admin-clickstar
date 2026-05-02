@@ -21,6 +21,7 @@ export type ProjectListParams = {
   search?: string;
   status?: ServiceStatus | "all";
   pm_id?: string;
+  company_id?: string;
   page?: number;
   pageSize?: number;
 };
@@ -73,6 +74,9 @@ export async function listProjects(
   }
   if (params.pm_id) {
     query = query.eq("pm_id", params.pm_id);
+  }
+  if (params.company_id) {
+    query = query.eq("company_id", params.company_id);
   }
 
   const { data, error, count } = await query;

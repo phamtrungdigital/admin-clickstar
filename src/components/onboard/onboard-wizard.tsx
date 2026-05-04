@@ -431,13 +431,17 @@ function Step1Customer({
             placeholder="VD: Thương mại điện tử"
           />
         </Field>
-        <Field label="Email" error={errorFor("customer.email")}>
+        <Field label="Email *" error={errorFor("customer.email")}>
           <Input
             type="email"
             value={value.email ?? ""}
             onChange={(e) => update("email", e.target.value)}
             placeholder="contact@khachhang.com"
           />
+          <p className="mt-1 text-[11px] text-slate-500">
+            Bắt buộc — hệ thống sẽ tự tạo tài khoản portal cho khách + gửi
+            email chào mừng kèm thông tin đăng nhập.
+          </p>
         </Field>
         <Field label="Số điện thoại" error={errorFor("customer.phone")}>
           <Input

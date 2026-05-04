@@ -212,6 +212,24 @@ async function CustomerView({
     project.id,
   ).catch(() => new Map());
 
+  // PostgREST nested embed `pm:profiles!fk(id, full_name)` đôi khi trả
+  // null cho field nếu RLS policy phức tạp. Fallback explicit fetch nếu
+  // project.pm_id có set nhưng project.pm null — đảm bảo customer luôn
+  // thấy PM nếu họ có quyền.
+  let resolvedPm = project.pm;
+  if (!resolvedPm && project.pm_id) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("id", project.pm_id)
+      .maybeSingle();
+    if (data) {
+      resolvedPm = { id: data.id as string, full_name: data.full_name as string };
+    }
+  }
+  const projectWithPm: ProjectDetail = { ...project, pm: resolvedPm };
+
   const stats = computeStats(project);
 
   return (
@@ -230,15 +248,15 @@ async function CustomerView({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <ProgressOverview project={project} stats={stats} />
+          <ProgressOverview project={projectWithPm} stats={stats} />
           <CustomerMilestonesLive
-            milestones={project.milestones}
+            milestones={projectWithPm.milestones}
             completionMetaByMilestone={completionMetaByMilestone}
           />
-          <ProjectDocumentsSection projectId={project.id} canManage={false} />
+          <ProjectDocumentsSection projectId={projectWithPm.id} canManage={false} />
         </div>
         <div className="space-y-6">
-          <ProjectInfoCard project={project} />
+          <ProjectInfoCard project={projectWithPm} />
         </div>
       </div>
     </div>

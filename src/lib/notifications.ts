@@ -46,19 +46,43 @@ export async function notify(items: NotifyArgs[]): Promise<void> {
   }
 }
 
-/** Returns profile IDs of all active internal admins / super_admins. */
+/** Active super_admin / admin / manager — admin tier broadly. Mở rộng
+ *  từ 2 → 3 role 2026-05-04 vì manager cũng cần biết khi có sự kiện
+ *  vận hành quan trọng (ticket, báo cáo, KH mới...). */
 export async function listAdminRecipientIds(): Promise<string[]> {
+  return listInternalRecipientIdsByRoles([
+    "super_admin",
+    "admin",
+    "manager",
+  ]);
+}
+
+/** Audience cho ticket events: admin tier + support (CSKH). PRD §3:
+ *  Support là người xử lý ticket đầu tiên — phải nhận notification ngay
+ *  khi KH tạo ticket. */
+export async function listTicketSupportRecipientIds(): Promise<string[]> {
+  return listInternalRecipientIdsByRoles([
+    "super_admin",
+    "admin",
+    "manager",
+    "support",
+  ]);
+}
+
+async function listInternalRecipientIdsByRoles(
+  roles: string[],
+): Promise<string[]> {
   try {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("profiles")
       .select("id")
       .eq("audience", "internal")
-      .in("internal_role", ["super_admin", "admin"])
+      .in("internal_role", roles)
       .eq("is_active", true)
       .is("deleted_at", null);
     if (error) {
-      console.error("[notifications] failed to list admins", error);
+      console.error("[notifications] failed to list recipients", error);
       return [];
     }
     return (data ?? []).map((r) => r.id);

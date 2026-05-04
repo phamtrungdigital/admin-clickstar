@@ -12,12 +12,17 @@ import {
   type UpdateTicketInput,
 } from "@/lib/validation/tickets";
 import {
-  listAdminRecipientIds,
+  listTicketSupportRecipientIds,
   notify,
   type NotifyArgs,
 } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email/send";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { TicketStatus } from "@/lib/database.types";
-import { TICKET_STATUS_OPTIONS } from "@/lib/validation/tickets";
+import {
+  TICKET_PRIORITY_OPTIONS,
+  TICKET_STATUS_OPTIONS,
+} from "@/lib/validation/tickets";
 
 export type TicketActionResult<T = void> =
   | { ok: true; data?: T }
@@ -38,18 +43,62 @@ function statusLabel(status: TicketStatus): string {
   );
 }
 
-/** Build the recipient set for ticket events: admins + assignee, minus the actor. */
+/** Build the recipient set for ticket events: admin tier + support
+ *  (CSKH) + assignee, minus the actor. Reporter có thể thêm vào tuỳ
+ *  ngữ cảnh (vd: staff reply public → notify reporter là KH). */
 async function ticketRecipients(opts: {
   actorId: string;
   assigneeId?: string | null;
   reporterId?: string | null;
 }): Promise<string[]> {
-  const adminIds = await listAdminRecipientIds();
-  const set = new Set<string>(adminIds);
+  const supportIds = await listTicketSupportRecipientIds();
+  const set = new Set<string>(supportIds);
   if (opts.assigneeId) set.add(opts.assigneeId);
   if (opts.reporterId) set.add(opts.reporterId);
   set.delete(opts.actorId);
   return [...set];
+}
+
+/** Helper: lookup profile + email cho 1 batch user_ids. Trả map
+ *  user_id → { full_name, email } để build vars cho email. */
+async function loadProfilesForEmail(
+  userIds: string[],
+): Promise<Map<string, { full_name: string; email: string | null }>> {
+  if (userIds.length === 0) return new Map();
+  const admin = createAdminClient();
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", userIds);
+  const result = new Map<
+    string,
+    { full_name: string; email: string | null }
+  >();
+  // Profile rows don't carry email (auth.users does). Resolve via auth admin.
+  for (const p of profiles ?? []) {
+    result.set(p.id as string, {
+      full_name: (p.full_name as string) || "Bạn",
+      email: null,
+    });
+  }
+  for (const id of userIds) {
+    if (!result.has(id)) {
+      result.set(id, { full_name: "Bạn", email: null });
+    }
+    const { data: userResp } = await admin.auth.admin.getUserById(id);
+    const email = userResp?.user?.email ?? null;
+    const existing = result.get(id)!;
+    result.set(id, { ...existing, email });
+  }
+  return result;
+}
+
+/** App URL — dùng trong link tới /tickets/<id> trong email template. */
+function appUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
+    ?? "https://portal.clickstar.vn"
+  );
 }
 
 export async function createTicketAction(
@@ -140,7 +189,7 @@ export async function createTicketAction(
     return { ok: false, message: error?.message ?? "Không tạo được ticket" };
   }
 
-  // Fan out in-app notifications to admins + assignee.
+  // Fan out in-app notifications to admin tier + support + assignee.
   const recipients = await ticketRecipients({
     actorId: user.id,
     assigneeId: data.assignee_id,
@@ -159,9 +208,62 @@ export async function createTicketAction(
   }));
   await notify(items);
 
+  // Email — gửi song song với in-app cho nội bộ. Mỗi recipient được render
+  // với name riêng. Khách (reporter) không nhận email "ticket_created"
+  // (họ vừa tự tạo, không cần email lại). Failure non-fatal — chỉ log.
+  try {
+    const profiles = await loadProfilesForEmail(recipients);
+    const adminTicketCode = await fetchTicketCode(data.id);
+    const customerName = await fetchCompanyName(data.company_id as string);
+    const link = `${appUrl()}/tickets/${data.id}`;
+    const priorityLabel =
+      TICKET_PRIORITY_OPTIONS.find((p) => p.value === payload.priority)
+        ?.label ?? (payload.priority as string);
+    for (const rid of recipients) {
+      const profile = profiles.get(rid);
+      if (!profile?.email) continue;
+      void sendEmail({
+        templateCode: "ticket_created",
+        recipientEmail: profile.email,
+        recipientUserId: rid,
+        companyId: data.company_id as string,
+        vars: {
+          name: profile.full_name,
+          customer_name: customerName ?? "Khách hàng",
+          ticket_code: adminTicketCode ?? data.id.slice(0, 8),
+          ticket_title: data.title as string,
+          priority: priorityLabel,
+          link,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("[ticket email] ticket_created failed", err);
+  }
+
   revalidatePath("/tickets");
   revalidatePath("/dashboard");
   return { ok: true, data: { id: data.id } };
+}
+
+async function fetchTicketCode(ticketId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("tickets")
+    .select("code")
+    .eq("id", ticketId)
+    .maybeSingle();
+  return (data?.code as string | null) ?? null;
+}
+
+async function fetchCompanyName(companyId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("companies")
+    .select("name")
+    .eq("id", companyId)
+    .maybeSingle();
+  return (data?.name as string | null) ?? null;
 }
 
 export async function updateTicketAction(
@@ -267,6 +369,33 @@ export async function changeTicketStatusAction(
         entity_id: id,
       })),
     );
+
+    // Email — gửi cho tất cả recipients (bao gồm reporter là KH) để KH
+    // biết tiến độ. Status label tiếng Việt từ TICKET_STATUS_OPTIONS.
+    try {
+      const profiles = await loadProfilesForEmail(recipients);
+      const ticketCode = await fetchTicketCode(id);
+      const link = `${appUrl()}/tickets/${id}`;
+      for (const rid of recipients) {
+        const profile = profiles.get(rid);
+        if (!profile?.email) continue;
+        void sendEmail({
+          templateCode: "ticket_status_changed",
+          recipientEmail: profile.email,
+          recipientUserId: rid,
+          companyId: row.company_id as string,
+          vars: {
+            name: profile.full_name,
+            ticket_code: ticketCode ?? id.slice(0, 8),
+            ticket_title: row.title as string,
+            status: statusLabel(status),
+            link,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("[ticket email] ticket_status_changed failed", err);
+    }
   }
 
   revalidatePath("/tickets");
@@ -410,6 +539,40 @@ export async function addTicketCommentAction(
     entity_id: ticketId,
   }));
   await notify(notifyArgs);
+
+  // Email — note nội bộ thì KHÔNG email cho ai (tránh leak ra KH nếu họ
+  // vô tình ở recipient list); reply public thì email cho recipients.
+  if (!isInternalNote) {
+    try {
+      const profiles = await loadProfilesForEmail(recipients);
+      const ticketCode = await fetchTicketCode(ticketId);
+      const link = `${appUrl()}/tickets/${ticketId}`;
+      const actorProfile = await loadProfilesForEmail([user.id]);
+      const actorName =
+        actorProfile.get(user.id)?.full_name ?? "Người dùng";
+      const replyExcerpt = parsed.data.body.slice(0, 200);
+      for (const rid of recipients) {
+        const profile = profiles.get(rid);
+        if (!profile?.email) continue;
+        void sendEmail({
+          templateCode: "ticket_replied",
+          recipientEmail: profile.email,
+          recipientUserId: rid,
+          companyId: ticket.company_id as string,
+          vars: {
+            name: profile.full_name,
+            actor_name: actorName,
+            ticket_code: ticketCode ?? ticketId.slice(0, 8),
+            ticket_title: ticket.title as string,
+            reply_excerpt: replyExcerpt,
+            link,
+          },
+        });
+      }
+    } catch (err) {
+      console.error("[ticket email] ticket_replied failed", err);
+    }
+  }
 
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets");

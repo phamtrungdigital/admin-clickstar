@@ -5,8 +5,10 @@ import { Bell, BellRing } from "lucide-react";
 
 import { EmptyState as EmptyStateUI } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { RefreshOnMount } from "@/components/dashboard/refresh-on-mount";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { markAllNotificationsAsReadAction } from "./actions";
 
 export const metadata = { title: "Thông báo | Portal.Clickstar.vn" };
 
@@ -21,10 +23,21 @@ export default async function NotificationsPage() {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  // Count unread BEFORE marking as read — để hiện trong description "Bạn
+  // có N thông báo chưa đọc" (UX tự nhiên: vào page = đã thấy = đã đọc).
   const unread = (rows ?? []).filter((r) => !r.read_at).length;
+
+  // Mark tất cả là đã đọc khi user mở /notifications page. Action sẽ
+  // revalidatePath("/", "layout") → header bell badge cập nhật khi user
+  // điều hướng tiếp. Kết hợp <RefreshOnMount/> phía dưới để badge tụt
+  // ngay trong cùng request (router.refresh từ client).
+  if (unread > 0) {
+    await markAllNotificationsAsReadAction();
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {unread > 0 && <RefreshOnMount />}
       <PageHeader
         title="Thông báo"
         description={

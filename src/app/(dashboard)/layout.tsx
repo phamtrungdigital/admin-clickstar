@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { HeaderBar } from "@/components/dashboard/header-bar";
@@ -12,19 +12,31 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { id: userId, email, profile } = await getCurrentUser();
+  // Perf: layout chạy mỗi page nav. Trước đây gọi 3 query sequential
+  // (auth.getUser → profiles → notifications.count) = 3 round-trips. Giờ
+  // gộp: 1 round-trip auth.getUser, sau đó parallel profile + count
+  // bằng Promise.all → còn 2 round-trips. Tiết kiệm ~50-100ms mỗi nav.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const userId = user.id;
+  const email = user.email ?? "";
+
+  const [{ data: profile }, { count: unreadCount }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .is("read_at", null),
+  ]);
 
   const audience = profile?.audience ?? "internal";
   const internalRole = profile?.internal_role ?? null;
   const role = audience === "customer" ? "viewer" : internalRole ?? "staff";
-
-  // Bell badge count — cheap aggregate query, runs once per layout render.
-  const supabase = await createClient();
-  const { count: unreadCount } = await supabase
-    .from("notifications")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .is("read_at", null);
 
   return (
     <MobileSidebarProvider>

@@ -202,9 +202,32 @@ export async function completeMilestoneAction(
   }
 
   const supabase = await createClient();
+  // Dùng admin client để load context (project + company) — staff thường
+  // có RLS access nhưng nested embed đôi khi trả null khi join qua nhiều
+  // table với policy khác nhau. Action chỉ dùng admin client để LOOKUP
+  // metadata cho notify, không bypass auth — đã check isInternal ở trên.
+  const adminClient = createAdminClient();
 
-  // Lấy milestone + project + company để build notification context
-  const { data: ms, error: msErr } = await supabase
+  // Verify milestone thực sự tồn tại + user có quyền read (qua client thường)
+  const { data: msAuth, error: msAuthErr } = await supabase
+    .from("milestones")
+    .select("id, status")
+    .eq("id", milestoneId)
+    .maybeSingle();
+
+  if (msAuthErr) {
+    console.error("[milestone-complete] auth check failed", msAuthErr);
+    return { ok: false, message: msAuthErr.message };
+  }
+  if (!msAuth) {
+    return { ok: false, message: "Không tìm thấy milestone hoặc bạn không có quyền" };
+  }
+  if (msAuth.status === "completed") {
+    return { ok: false, message: "Milestone đã ở trạng thái hoàn thành" };
+  }
+
+  // Lấy full context qua admin client (bỏ qua RLS — chỉ đọc metadata)
+  const { data: ms, error: msErr } = await adminClient
     .from("milestones")
     .select(
       `
@@ -220,11 +243,8 @@ export async function completeMilestoneAction(
     .eq("id", milestoneId)
     .maybeSingle();
   if (msErr || !ms) {
-    return { ok: false, message: "Không tìm thấy milestone" };
-  }
-
-  if (ms.status === "completed") {
-    return { ok: false, message: "Milestone đã ở trạng thái hoàn thành" };
+    console.error("[milestone-complete] context load failed", msErr);
+    return { ok: false, message: "Không load được context milestone" };
   }
 
   // Insert completion row (RLS check: completed_by = auth.uid + access company)
@@ -408,6 +428,7 @@ export async function reopenMilestoneAction(
   }
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
   // Tìm completion active hiện tại của milestone này
   const { data: completion } = await supabase
@@ -433,11 +454,17 @@ export async function reopenMilestoneAction(
     .eq("id", completion.id);
   if (rErr) return { ok: false, message: rErr.message };
 
-  // Revert milestone về active
-  const { data: ms, error: msErr } = await supabase
+  // Revert milestone về active (qua user client để giữ audit chain)
+  const { error: revErr } = await supabase
     .from("milestones")
     .update({ status: "active" })
-    .eq("id", milestoneId)
+    .eq("id", milestoneId);
+  if (revErr) return { ok: false, message: revErr.message };
+
+  // Lấy full context qua admin client cho notify (cùng lý do trong
+  // completeMilestoneAction — embed nested có thể trả null với RLS staff).
+  const { data: ms, error: msErr } = await adminClient
+    .from("milestones")
     .select(
       `
       id, title, project_id,
@@ -449,8 +476,14 @@ export async function reopenMilestoneAction(
       )
     `,
     )
+    .eq("id", milestoneId)
     .single();
-  if (msErr || !ms) return { ok: false, message: msErr?.message ?? "fail" };
+  if (msErr || !ms) {
+    console.error("[milestone-reopen] context load failed", msErr);
+    // Vẫn return OK vì revert đã thành công, chỉ skip notify
+    revalidatePath(`/projects/${milestoneId}`);
+    return { ok: true };
+  }
 
   await logAudit({
     user_id: userId,
@@ -500,5 +533,3 @@ export async function reopenMilestoneAction(
   return { ok: true };
 }
 
-// Suppress unused import warnings (admin client reserved for future signed-URL helpers)
-void createAdminClient;

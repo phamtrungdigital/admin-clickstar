@@ -12,9 +12,12 @@ import {
 } from "@/components/tickets/ticket-badges";
 import { TicketAttachmentsDisplay } from "@/components/tickets/ticket-attachments-display";
 import { getTicketById } from "@/lib/queries/tickets";
+import { listTicketComments } from "@/lib/queries/ticket-comments";
+import { TicketComments } from "@/components/tickets/ticket-comments";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
+import type { TicketAttachment } from "@/lib/database.types";
 
 export const metadata = { title: "Chi tiết ticket | Portal.Clickstar.vn" };
 
@@ -24,29 +27,37 @@ export default async function TicketDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [{ profile }, ticket] = await Promise.all([
+  const [{ id: currentUserId, profile }, ticket, comments] = await Promise.all([
     getCurrentUser(),
     getTicketById(id).catch(() => null),
+    listTicketComments(id).catch(() => []),
   ]);
   if (!ticket) notFound();
   const canSeeAssignee = isInternal(profile);
+  const isInternalUser = isInternal(profile);
 
-  // Pre-sign attachment URLs server-side so the client doesn't need to make
-  // a round-trip on render.
-  const attachments = ticket.attachments ?? [];
+  // Pre-sign attachment URLs (cả attachments của ticket lẫn của comments)
+  // server-side để client khỏi round-trip.
+  const ticketAttachments = ticket.attachments ?? [];
+  const commentAttachments: TicketAttachment[] = comments.flatMap(
+    (c) => (c.attachments as TicketAttachment[] | null) ?? [],
+  );
+  const allPaths = Array.from(
+    new Set(
+      [...ticketAttachments, ...commentAttachments].map((a) => a.path),
+    ),
+  );
   const urls: Record<string, string> = {};
-  if (attachments.length > 0) {
+  if (allPaths.length > 0) {
     const supabase = await createClient();
     const { data } = await supabase.storage
       .from("documents")
-      .createSignedUrls(
-        attachments.map((a) => a.path),
-        60 * 60,
-      );
+      .createSignedUrls(allPaths, 60 * 60);
     for (const item of data ?? []) {
       if (item.signedUrl && item.path) urls[item.path] = item.signedUrl;
     }
   }
+  const attachments = ticketAttachments;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -114,9 +125,15 @@ export default async function TicketDetailPage({
             <TicketAttachmentsDisplay attachments={attachments} urls={urls} />
           </div>
 
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            Bình luận và lịch sử xử lý sẽ hiển thị tại đây ở phase sau.
-          </div>
+          <TicketComments
+            ticketId={ticket.id}
+            ticketStatus={ticket.status}
+            comments={comments}
+            attachmentUrls={urls}
+            currentUserId={currentUserId}
+            isInternalUser={isInternalUser}
+            companyId={ticket.company_id}
+          />
         </div>
 
         <div className="space-y-4">

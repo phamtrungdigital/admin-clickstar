@@ -291,3 +291,161 @@ export async function softDeleteTicketAction(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Comments — add + auto-update ticket status when customer replies.
+// ────────────────────────────────────────────────────────────────────────────
+
+import { ticketCommentSchema, type TicketCommentInput } from "@/lib/validation/tickets";
+import { logAudit } from "@/lib/audit";
+
+export async function addTicketCommentAction(
+  ticketId: string,
+  input: TicketCommentInput,
+): Promise<TicketActionResult<{ id: string }>> {
+  const parsed = ticketCommentSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Nội dung không hợp lệ",
+      fieldErrors: flattenZodErrors(parsed.error),
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
+
+  // Determine caller audience to enforce internal-note guardrail.
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("audience, internal_role")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isCustomerCaller = callerProfile?.audience === "customer";
+
+  // Customer can never post an "internal note" — server forces false.
+  const isInternalNote = isCustomerCaller ? false : parsed.data.is_internal;
+
+  // Fetch ticket for audit + auto-status logic + notification recipients.
+  const { data: ticket, error: tErr } = await supabase
+    .from("tickets")
+    .select("id, status, company_id, reporter_id, assignee_id, title")
+    .eq("id", ticketId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (tErr) return { ok: false, message: tErr.message };
+  if (!ticket) return { ok: false, message: "Ticket không tồn tại" };
+
+  const { data: comment, error } = await supabase
+    .from("ticket_comments")
+    .insert({
+      ticket_id: ticketId,
+      author_id: user.id,
+      body: parsed.data.body,
+      is_internal: isInternalNote,
+      attachments: parsed.data.attachments,
+    })
+    .select("id")
+    .single();
+  if (error || !comment) {
+    return { ok: false, message: error?.message ?? "Không gửi được bình luận" };
+  }
+
+  // Auto status transition: customer reply on a ticket waiting for them →
+  // bring it back to "in_progress" so internal sees it needs attention.
+  // Don't auto-transition for internal replies — staff manage status via
+  // the row menu / edit form.
+  if (
+    isCustomerCaller
+    && !isInternalNote
+    && ticket.status === "awaiting_customer"
+  ) {
+    const { error: stErr } = await supabase
+      .from("tickets")
+      .update({ status: "in_progress" })
+      .eq("id", ticketId);
+    if (stErr) {
+      console.error("[ticket-comment] auto-status update failed", stErr);
+    }
+  }
+
+  await logAudit({
+    user_id: user.id,
+    company_id: ticket.company_id as string,
+    action: "create",
+    entity_type: "ticket",
+    entity_id: ticketId,
+    new_value: {
+      kind: "comment",
+      is_internal: isInternalNote,
+      length: parsed.data.body.length,
+    },
+  });
+
+  // Notify the "other side": customer reply → notify assignee + admins.
+  // Internal public reply → notify reporter (the customer who filed it).
+  // Internal note → notify only assignee + admins, never customer.
+  const recipients = await ticketRecipients({
+    actorId: user.id,
+    assigneeId: ticket.assignee_id as string | null,
+    reporterId:
+      isInternalNote || isCustomerCaller
+        ? null
+        : (ticket.reporter_id as string | null),
+  });
+  const notifyArgs: NotifyArgs[] = recipients.map((rid) => ({
+    user_id: rid,
+    company_id: ticket.company_id as string,
+    title: isCustomerCaller
+      ? `KH phản hồi: ${ticket.title}`
+      : isInternalNote
+        ? `Note nội bộ: ${ticket.title}`
+        : `Phản hồi mới: ${ticket.title}`,
+    body: parsed.data.body.slice(0, 200),
+    link_url: `/tickets/${ticketId}`,
+    entity_type: "ticket",
+    entity_id: ticketId,
+  }));
+  await notify(notifyArgs);
+
+  revalidatePath(`/tickets/${ticketId}`);
+  revalidatePath("/tickets");
+  return { ok: true, data: { id: comment.id as string } };
+}
+
+export async function softDeleteTicketCommentAction(
+  commentId: string,
+  ticketId: string,
+): Promise<TicketActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
+
+  const { data: existing } = await supabase
+    .from("ticket_comments")
+    .select("author_id")
+    .eq("id", commentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) return { ok: false, message: "Bình luận không tồn tại" };
+  if (existing.author_id !== user.id) {
+    return {
+      ok: false,
+      message: "Chỉ tác giả mới xoá được bình luận của chính mình.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("ticket_comments")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", commentId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/tickets/${ticketId}`);
+  return { ok: true };
+}

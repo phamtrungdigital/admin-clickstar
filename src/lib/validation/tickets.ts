@@ -43,6 +43,14 @@ export const updateTicketSchema = createTicketSchema.partial();
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 
+export const ticketCommentSchema = z.object({
+  body: trimmed.min(1, "Nội dung không được để trống").max(5000),
+  /** Internal note — chỉ staff thấy. Khách hàng post luôn = false. */
+  is_internal: z.boolean().default(false),
+  attachments: z.array(ticketAttachmentSchema).default([]),
+});
+export type TicketCommentInput = z.infer<typeof ticketCommentSchema>;
+
 export const TICKET_STATUS_OPTIONS: {
   value: (typeof TICKET_STATUS)[number];
   label: string;

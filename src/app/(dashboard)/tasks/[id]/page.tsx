@@ -33,7 +33,7 @@ import {
 } from "@/lib/validation/tasks";
 import type { TaskPriority, TaskStatus } from "@/lib/database.types";
 
-export const metadata = { title: "Chi tiết task | Portal.Clickstar.vn" };
+export const metadata = { title: "Chi tiết đầu việc | Portal.Clickstar.vn" };
 
 const STATUS_TONE: Record<TaskStatus, string> = {
   todo: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -80,7 +80,7 @@ export default async function TaskDetailPage({
         title={task.title}
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
-          { label: "Công việc", href: "/tasks" },
+          { label: "Đầu việc", href: "/tasks" },
           ...(task.project
             ? ([
                 {

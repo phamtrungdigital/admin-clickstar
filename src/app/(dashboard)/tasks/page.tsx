@@ -36,7 +36,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Công việc | Portal.Clickstar.vn" };
+export const metadata = { title: "Đầu việc | Portal.Clickstar.vn" };
 
 type SearchParams = {
   view?: string;
@@ -141,15 +141,15 @@ export default async function TasksPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Công việc"
+        title="Đầu việc"
         description={
           canViewAll
-            ? "Toàn bộ task trong hệ thống. Filter theo dự án, deadline, người phụ trách."
-            : "Task được giao cho anh/chị."
+            ? "Toàn bộ đầu việc (task) trong hệ thống — chi tiết hơn Công việc (Milestone). Filter theo dự án, deadline, người phụ trách."
+            : "Đầu việc (task) được giao cho anh/chị — chi tiết phụ trợ trong các Công việc (Milestone)."
         }
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
-          { label: "Công việc" },
+          { label: "Đầu việc" },
         ]}
         actions={
           canViewAll ? (
@@ -160,7 +160,7 @@ export default async function TasksPage({
                 "bg-blue-600 px-4 text-white hover:bg-blue-700",
               )}
             >
-              <Plus className="mr-2 h-4 w-4" /> Tạo task
+              <Plus className="mr-2 h-4 w-4" /> Tạo đầu việc
             </Link>
           ) : null
         }

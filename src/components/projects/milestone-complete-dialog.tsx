@@ -175,7 +175,7 @@ export function MilestoneCompleteDialog({
               Đánh dấu hoàn thành
             </h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              Milestone:{" "}
+              Công việc:{" "}
               <span className="font-medium text-slate-700">
                 {milestoneTitle}
               </span>

@@ -148,7 +148,9 @@ export default async function ProjectDetailPage({
             companyId={project.company?.id ?? null}
             isAdmin={isAdminLevel}
           />
-          <TasksPreview tasks={project.tasks} />
+          {/* TasksPreview bỏ — phương án C, đầu việc chi tiết hiện trong
+              MilestoneCard (toggle "Hiện đầu việc"). Nhân viên muốn xem
+              tổng thể đầu việc của mình thì vào /tasks. */}
           <ProjectDocumentsSection
             projectId={project.id}
             companyId={project.company?.id}
@@ -198,9 +200,8 @@ async function CustomerView({
           <div className="space-y-6 lg:col-span-2">
             <CustomerProgressOverview payload={payload} />
             <CustomerMilestones milestones={payload.milestones} />
-            {payload.tasks.length > 0 && (
-              <CustomerTasksPreview tasks={payload.tasks} />
-            )}
+            {/* CustomerTasksPreview bỏ — phương án C, khách chỉ thấy
+                "Công việc" (= milestones) cho gọn, đỡ nhầm lẫn 2 cấp. */}
             <ProjectDocumentsSection
               projectId={project.id}
               canManage={false}
@@ -258,7 +259,7 @@ function CustomerNoSnapshotBanner() {
       <strong>Đang chờ Clickstar tạo bản tổng hợp đầu tiên.</strong>
       <br />
       Khi PM phụ trách công bố bản tổng hợp tiến độ, anh/chị sẽ thấy chi tiết
-      milestones và task ở đây.
+      các công việc ở đây.
     </div>
   );
 }
@@ -324,11 +325,9 @@ function CustomerMilestones({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">
-          Các giai đoạn (Milestones)
-        </h3>
+        <h3 className="text-sm font-semibold text-slate-900">Công việc</h3>
         <span className="text-xs text-slate-500">
-          {milestones.length} giai đoạn
+          {milestones.length} công việc
         </span>
       </div>
       <ol className="relative space-y-5 border-l border-slate-200 pl-6">
@@ -389,7 +388,10 @@ function CustomerMilestones({
   );
 }
 
-function CustomerTasksPreview({
+// Reserved cho future re-enable — phương án C bỏ TasksPreview khỏi UI
+// mặc định, nếu sau này cần expose lại thì re-wire.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _CustomerTasksPreview({
   tasks,
 }: {
   tasks: NonNullable<ReturnType<typeof readSnapshotPayload>>["tasks"];
@@ -514,16 +516,14 @@ function MilestonesSection({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-900">
-          Các giai đoạn (Milestones)
-        </h3>
+        <h3 className="text-sm font-semibold text-slate-900">Công việc</h3>
         <span className="text-xs text-slate-500">
-          {milestones.length} giai đoạn · click để mở chi tiết
+          {milestones.length} công việc · click để mở chi tiết
         </span>
       </div>
       {milestones.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
-          Dự án này chưa có milestone nào.
+          Dự án này chưa có công việc nào.
         </p>
       ) : (
         <ol className="relative space-y-5 border-l border-slate-200 pl-6">
@@ -546,7 +546,8 @@ function MilestonesSection({
   );
 }
 
-function TasksPreview({ tasks }: { tasks: ProjectDetail["tasks"] }) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _TasksPreview({ tasks }: { tasks: ProjectDetail["tasks"] }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">

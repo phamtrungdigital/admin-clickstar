@@ -138,6 +138,9 @@ export function MilestoneCard({
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  // Phương án C: tasks (đầu việc) ẩn mặc định trong milestone card.
+  // Click "Hiện đầu việc" mới expand — đỡ clutter cho admin/PM nhìn tổng quan.
+  const [showTasks, setShowTasks] = useState(false);
   const tone = STATUS_TONE[milestone.status] ?? STATUS_TONE.not_started;
   const isCompleted = milestone.status === "completed" && completion !== null;
 
@@ -253,8 +256,24 @@ export function MilestoneCard({
             </>
           )}
 
-          {/* Tasks trong milestone */}
-          {tasks.length > 0 && <MilestoneTasks tasks={tasks} />}
+          {/* Đầu việc trong công việc — collapsed default (phương án C) */}
+          {tasks.length > 0 && (
+            <div className="space-y-2 border-t border-slate-200 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowTasks((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"
+              >
+                {showTasks ? (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                {showTasks ? "Ẩn" : "Hiện"} đầu việc chi tiết ({tasks.length})
+              </button>
+              {showTasks && <MilestoneTasks tasks={tasks} />}
+            </div>
+          )}
 
           {/* Thread bình luận */}
           <MilestoneComments
@@ -374,7 +393,7 @@ function MilestoneEditForm({
         toast.error(result.message);
         return;
       }
-      toast.success("Đã cập nhật milestone");
+      toast.success("Đã cập nhật công việc");
       router.refresh();
       onSaved();
     });
@@ -383,7 +402,7 @@ function MilestoneEditForm({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-700">Tên giai đoạn *</Label>
+        <Label className="text-xs font-medium text-slate-700">Tên công việc *</Label>
         <Input
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -498,11 +517,10 @@ function MilestoneEditForm({
 }
 
 function MilestoneTasks({ tasks }: { tasks: TaskRow[] }) {
+  // Header (count + toggle) đã render ở parent (MilestoneCard) rồi —
+  // ở đây chỉ render danh sách
   return (
-    <div className="space-y-2 border-t border-slate-200 pt-3">
-      <p className="text-xs font-semibold text-slate-700">
-        Đầu việc trong giai đoạn ({tasks.length})
-      </p>
+    <div className="space-y-2">
       <ul className="space-y-1.5">
         {tasks.map((t) => (
           <li

@@ -11,7 +11,7 @@ import { getTaskById } from "@/lib/queries/tasks";
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalPage } from "@/lib/auth/guards";
 
-export const metadata = { title: "Sửa task | Portal.Clickstar.vn" };
+export const metadata = { title: "Sửa đầu việc | Portal.Clickstar.vn" };
 
 export default async function EditTaskPage({
   params,
@@ -32,10 +32,10 @@ export default async function EditTaskPage({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
-        title={`Sửa task: ${task.title}`}
+        title={`Sửa đầu việc: ${task.title}`}
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
-          { label: "Công việc", href: "/tasks" },
+          { label: "Đầu việc", href: "/tasks" },
           { label: task.title, href: `/tasks/${task.id}` },
           { label: "Sửa" },
         ]}

@@ -85,9 +85,10 @@ export const internalNav: NavItem[] = [
     href: "/tasks",
     icon: ListChecks,
     children: [
-      // Công việc: bỏ support + accountant
+      // Đầu việc của tôi: task-level (nhỏ hơn "Công việc" = milestone).
+      // Bỏ support + accountant.
       {
-        label: "Công việc",
+        label: "Đầu việc của tôi",
         href: "/tasks",
         icon: ListChecks,
         allowedRoles: ROLES_OPS,

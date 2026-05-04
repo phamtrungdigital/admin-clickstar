@@ -8,7 +8,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalPage } from "@/lib/auth/guards";
 
-export const metadata = { title: "Tạo task | Portal.Clickstar.vn" };
+export const metadata = { title: "Tạo đầu việc | Portal.Clickstar.vn" };
 
 export default async function NewTaskPage({
   searchParams,
@@ -26,11 +26,11 @@ export default async function NewTaskPage({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
-        title="Tạo task ad-hoc"
-        description="Task ngoài template (phát sinh / nội bộ). Task từ template được tạo tự động khi fork."
+        title="Tạo đầu việc ad-hoc"
+        description="Đầu việc ngoài template (phát sinh / nội bộ). Đầu việc từ template được tạo tự động khi fork."
         breadcrumb={[
           { label: "Trang chủ", href: "/dashboard" },
-          { label: "Công việc", href: "/tasks" },
+          { label: "Đầu việc", href: "/tasks" },
           { label: "Tạo mới" },
         ]}
       />

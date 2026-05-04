@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireInternalAction, canManageCustomers } from "@/lib/auth/guards";
 import {
   createCompanySchema,
@@ -15,6 +16,7 @@ import {
 import { onboardSchema, type OnboardInput } from "@/lib/validation/onboard";
 import { createContractAction } from "@/app/(dashboard)/contracts/actions";
 import { logAudit } from "@/lib/audit";
+import { sendEmail } from "@/lib/email/send";
 
 export type ActionResult<T = void> =
   | { ok: true; data?: T }
@@ -118,8 +120,133 @@ export async function createCustomerAction(
     },
   });
 
+  // Auto-provision tài khoản portal cho khách + bắn welcome email.
+  // Non-fatal: nếu auth.createUser fail (vd. email đã tồn tại) → company
+  // vẫn được tạo, admin nhận warning để xử lý thủ công sau.
+  let provisionWarning: string | null = null;
+  if (payload.email) {
+    const result = await provisionCustomerAccount({
+      email: payload.email as string,
+      companyId: company.id,
+      companyName: payload.name as string,
+      contactName: (payload.representative as string | null) ?? null,
+    });
+    if (!result.ok) provisionWarning = result.warning;
+  }
+
   revalidatePath("/customers");
-  return { ok: true, data: { id: company.id } };
+  return {
+    ok: true,
+    data: { id: company.id },
+    ...(provisionWarning ? { message: provisionWarning } : {}),
+  } as ActionResult<{ id: string }> & { message?: string };
+}
+
+/**
+ * Tạo tài khoản Supabase Auth cho khách hàng + link vào company_members
+ * + bắn welcome email với mật khẩu tạm.
+ *
+ * Non-fatal — return { ok: false, warning } để caller log warning chứ
+ * không rollback company creation. Trường hợp phổ biến cần soft-fail:
+ *   - Email đã tồn tại (đã có account) → chỉ link company_member, skip
+ *     gửi email (vì user đã có credentials cũ)
+ *   - RESEND_API_KEY thiếu → email không gửi được nhưng account vẫn tạo
+ */
+async function provisionCustomerAccount(args: {
+  email: string;
+  companyId: string;
+  companyName: string;
+  contactName: string | null;
+}): Promise<{ ok: true } | { ok: false; warning: string }> {
+  const admin = createAdminClient();
+
+  // Generate mật khẩu tạm: 12 ký tự, đủ entropy + dễ đọc lại nếu khách
+  // không nhận được email (admin có thể tra log).
+  const password = generateTempPassword();
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser(
+    {
+      email: args.email,
+      password,
+      email_confirm: true, // bypass email verify, account hoạt động ngay
+      user_metadata: {
+        audience: "customer",
+        full_name: args.contactName ?? args.companyName,
+      },
+    },
+  );
+
+  if (createErr) {
+    // Email đã tồn tại trong auth → admin cần link thủ công qua tab
+    // "Tài khoản" của customer detail (hiện tại vào /customers/[id] →
+    // tab "Tài khoản" có UI add member by email).
+    const isEmailExists =
+      createErr.message.toLowerCase().includes("already") ||
+      (createErr as { code?: string }).code === "email_exists";
+    return {
+      ok: false,
+      warning: isEmailExists
+        ? `Email "${args.email}" đã có tài khoản portal. Vào tab "Tài khoản" của khách hàng để link.`
+        : `Không tạo được tài khoản portal: ${createErr.message}`,
+    };
+  }
+
+  const userId = created?.user?.id ?? null;
+  if (!userId) {
+    return { ok: false, warning: "Supabase không trả user_id sau khi tạo" };
+  }
+
+  // 2. Link user vào company_members (role: viewer)
+  const { error: linkErr } = await admin
+    .from("company_members")
+    .upsert(
+      {
+        company_id: args.companyId,
+        user_id: userId,
+        role: "viewer",
+      },
+      { onConflict: "company_id,user_id" },
+    );
+  if (linkErr) {
+    return {
+      ok: false,
+      warning: `Đã tạo account nhưng chưa link được vào company: ${linkErr.message}`,
+    };
+  }
+
+  // 3. Gửi welcome email với credentials
+  {
+    const loginUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ?? "https://portal.clickstar.vn";
+    await sendEmail({
+      templateCode: "customer_welcome",
+      recipientEmail: args.email,
+      recipientUserId: userId,
+      companyId: args.companyId,
+      vars: {
+        company_name: args.companyName,
+        contact_name: args.contactName ?? args.companyName,
+        login_email: args.email,
+        login_password: password,
+        login_url: loginUrl,
+      },
+    }).catch((err) => {
+      console.error("[customer-welcome] email send failed", err);
+    });
+  }
+
+  return { ok: true };
+}
+
+function generateTempPassword(): string {
+  // 12 ký tự alphanum + 1 special — bypass weak-password rules of Supabase
+  const chars =
+    "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let p = "";
+  for (let i = 0; i < 11; i++) {
+    p += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return p + "!";
 }
 
 export async function updateCustomerAction(

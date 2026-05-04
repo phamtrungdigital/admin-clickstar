@@ -183,13 +183,17 @@ export function CustomerForm({
 
       <FormSection title="Liên hệ" description="Thông tin liên hệ chính của khách hàng.">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Email" error={errors.email?.message}>
+          <Field label="Email *" error={errors.email?.message}>
             <Input
               type="email"
               {...register("email")}
               placeholder="contact@khachhang.com"
               autoComplete="email"
             />
+            <p className="mt-1 text-[11px] text-slate-500">
+              Bắt buộc — hệ thống sẽ tự tạo tài khoản portal cho khách + gửi
+              email chào mừng kèm thông tin đăng nhập.
+            </p>
           </Field>
           <Field label="Số điện thoại" error={errors.phone?.message}>
             <Input

@@ -22,9 +22,10 @@ export const createCompanySchema = z.object({
     ),
   representative: trimmedString.max(255),
   email: trimmedString
+    .min(1, "Email là bắt buộc — dùng để tạo tài khoản đăng nhập cho khách")
     .max(255)
     .refine(
-      (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+      (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
       "Email không hợp lệ",
     ),
   phone: trimmedString.max(255),
@@ -53,7 +54,7 @@ const NULLABLE_FIELDS = [
   "code",
   "industry",
   "representative",
-  "email",
+  // email không nullable nữa — bắt buộc để tạo tài khoản đăng nhập cho KH
   "phone",
   "address",
   "tax_code",

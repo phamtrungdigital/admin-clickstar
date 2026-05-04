@@ -24,6 +24,7 @@ import {
 import {
   listActiveCompletionsByMilestoneIds,
   listCommentsByMilestoneIds,
+  listCustomerCompletionMetaByProject,
 } from "@/lib/queries/milestones";
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
@@ -204,11 +205,11 @@ async function CustomerView({
   // Vẫn ẩn các thông tin internal: edit form, comment thread, evidence
   // chi tiết của completion (proof file/link), tasks (đầu việc).
   //
-  // Load active completions để biết milestone nào đã được nghiệm thu
-  // chính thức (chỉ hiện ngày hoàn thành + tên người báo, không lộ proof).
-  const milestoneIds = project.milestones.map((m) => m.id);
-  const completionsByMilestone = await listActiveCompletionsByMilestoneIds(
-    milestoneIds,
+  // Completion meta: dùng RPC SECURITY DEFINER (migration 0040) để chỉ
+  // expose ngày hoàn thành + tên người báo (KHÔNG có summary/attachments
+  // — proof internal-only).
+  const completionMetaByMilestone = await listCustomerCompletionMetaByProject(
+    project.id,
   ).catch(() => new Map());
 
   const stats = computeStats(project);
@@ -232,7 +233,7 @@ async function CustomerView({
           <ProgressOverview project={project} stats={stats} />
           <CustomerMilestonesLive
             milestones={project.milestones}
-            completionsByMilestone={completionsByMilestone}
+            completionMetaByMilestone={completionMetaByMilestone}
           />
           <ProjectDocumentsSection projectId={project.id} canManage={false} />
         </div>
@@ -255,11 +256,11 @@ async function CustomerView({
  */
 function CustomerMilestonesLive({
   milestones,
-  completionsByMilestone,
+  completionMetaByMilestone,
 }: {
   milestones: ProjectDetail["milestones"];
-  completionsByMilestone: Awaited<
-    ReturnType<typeof listActiveCompletionsByMilestoneIds>
+  completionMetaByMilestone: Awaited<
+    ReturnType<typeof listCustomerCompletionMetaByProject>
   >;
 }) {
   return (
@@ -287,7 +288,7 @@ function CustomerMilestonesLive({
         <ol className="relative space-y-5 border-l border-slate-200 pl-6">
           {milestones.map((m) => {
             const tone = MILESTONE_TONE[m.status] ?? MILESTONE_TONE.not_started;
-            const completion = completionsByMilestone.get(m.id);
+            const completionMeta = completionMetaByMilestone.get(m.id);
             return (
               <li key={m.id} className="relative">
                 <span
@@ -348,18 +349,23 @@ function CustomerMilestonesLive({
                 )}
 
                 {/* Khi đã hoàn thành: hiện 1 dòng "Đã nghiệm thu bởi
-                    [Tên] lúc [date]" — KHÔNG lộ summary/proof của
-                    completion (chỉ internal mới xem chi tiết). */}
-                {m.status === "completed" && completion && (
+                    [Tên] lúc [date]" — qua RPC customer-safe, KHÔNG lộ
+                    summary/proof của completion (chỉ internal mới xem). */}
+                {m.status === "completed" && completionMeta && (
                   <div className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
                     <Check className="h-3 w-3" />
                     Đã nghiệm thu
-                    {completion.completed_by?.full_name && (
+                    {completionMeta.completer_full_name && (
                       <>
-                        {" "}bởi <strong>{completion.completed_by.full_name}</strong>
+                        {" "}bởi{" "}
+                        <strong>{completionMeta.completer_full_name}</strong>
                       </>
                     )}{" "}
-                    · {format(new Date(completion.completed_at), "dd/MM/yyyy")}
+                    ·{" "}
+                    {format(
+                      new Date(completionMeta.completed_at),
+                      "dd/MM/yyyy",
+                    )}
                   </div>
                 )}
               </li>

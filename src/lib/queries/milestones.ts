@@ -138,6 +138,49 @@ export async function getActiveMilestoneCompletion(
   return (data ?? null) as unknown as MilestoneCompletionItem | null;
 }
 
+export type CustomerCompletionMeta = {
+  milestone_id: string;
+  completed_at: string;
+  completer_full_name: string | null;
+  completer_avatar_url: string | null;
+};
+
+/**
+ * Customer-safe completion metadata cho milestones của 1 project. Dùng
+ * SECURITY DEFINER function (migration 0040) để KHÔNG lộ summary +
+ * attachments + links (chỉ internal mới xem chi tiết proof).
+ *
+ * Trả Map keyed by milestone_id để render trong customer timeline.
+ */
+export async function listCustomerCompletionMetaByProject(
+  projectId: string,
+): Promise<Map<string, CustomerCompletionMeta>> {
+  const result = new Map<string, CustomerCompletionMeta>();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "get_customer_milestone_completion_meta",
+    { p_project_id: projectId },
+  );
+  if (error) {
+    // Non-fatal — customer view vẫn render milestones, chỉ thiếu badge
+    return result;
+  }
+  for (const row of (data ?? []) as Array<{
+    milestone_id: string;
+    completed_at: string;
+    completer_full_name: string | null;
+    completer_avatar_url: string | null;
+  }>) {
+    result.set(row.milestone_id, {
+      milestone_id: row.milestone_id,
+      completed_at: row.completed_at,
+      completer_full_name: row.completer_full_name,
+      completer_avatar_url: row.completer_avatar_url,
+    });
+  }
+  return result;
+}
+
 /**
  * Batch: lấy active completion cho nhiều milestones (1 round-trip),
  * trả về Map keyed by milestone_id.

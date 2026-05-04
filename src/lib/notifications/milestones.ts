@@ -214,6 +214,39 @@ export async function notifyMilestoneCommented(
     }
   }
 
+  // 5) Task assignees + reviewers — staff đang làm các đầu việc trong
+  // milestone này (cover trường hợp staff chưa báo xong + chưa comment
+  // nhưng đang phụ trách phần việc của milestone đó).
+  const { data: tasks } = await admin
+    .from("tasks")
+    .select("assignee_id, reviewer_id")
+    .eq("milestone_id", ctx.milestoneId)
+    .is("deleted_at", null);
+  for (const t of tasks ?? []) {
+    for (const uid of [t.assignee_id, t.reviewer_id] as Array<string | null>) {
+      if (uid && uid !== ctx.actorId) {
+        recipients.set(uid, { user_id: uid });
+      }
+    }
+  }
+
+  // 6) Fallback cuối: nếu vẫn không có recipient (vd milestone chưa có
+  // task + chưa có completion + admin là người duy nhất) → notify tất
+  // cả internal staff được assigned company của project. Đảm bảo team
+  // luôn nắm được feedback ngay cả khi phân công chưa hoàn thiện.
+  if (recipients.size === 0 && ctx.companyId) {
+    const { data: assigned } = await admin
+      .from("company_assignments")
+      .select("internal_user_id")
+      .eq("company_id", ctx.companyId);
+    for (const a of assigned ?? []) {
+      const uid = a.internal_user_id as string;
+      if (uid && uid !== ctx.actorId) {
+        recipients.set(uid, { user_id: uid });
+      }
+    }
+  }
+
   if (recipients.size === 0) return;
 
   const link = milestoneUrl(ctx.projectId, ctx.milestoneId);

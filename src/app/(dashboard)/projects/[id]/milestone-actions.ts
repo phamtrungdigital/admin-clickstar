@@ -70,6 +70,20 @@ export async function updateMilestoneAction(
     return { ok: false, message: "Không tìm thấy milestone" };
   }
 
+  // Chặn set status='completed' qua form edit — buộc dùng nút "Đánh dấu
+  // hoàn thành" để có evidence (summary + attachments + links). Nếu đã
+  // completed sẵn (data cũ) thì cho qua để form không break.
+  if (
+    parsed.data.status === "completed" &&
+    existing.status !== "completed"
+  ) {
+    return {
+      ok: false,
+      message:
+        "Để hoàn thành công việc, dùng nút 'Đánh dấu hoàn thành' (yêu cầu đính kèm bằng chứng nghiệm thu)",
+    };
+  }
+
   const { error } = await supabase
     .from("milestones")
     .update({

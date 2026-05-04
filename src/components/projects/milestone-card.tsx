@@ -438,13 +438,24 @@ function MilestoneEditForm({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {MILESTONE_STATUS_OPTIONS.map((o) => (
+              {/* Bỏ "completed" khỏi dropdown — phải qua nút "Đánh dấu
+                  hoàn thành" để có evidence. Nếu milestone đang
+                  completed (form mở từ trạng thái cũ) thì vẫn hiện
+                  option để Select không broken. */}
+              {MILESTONE_STATUS_OPTIONS.filter(
+                (o) =>
+                  o.value !== "completed" || milestone.status === "completed",
+              ).map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-[11px] text-slate-500">
+            Để hoàn thành: dùng nút <strong>Đánh dấu hoàn thành</strong>{" "}
+            (cần đính kèm bằng chứng nghiệm thu)
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-700">

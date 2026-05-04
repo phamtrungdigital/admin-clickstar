@@ -82,6 +82,35 @@ export async function listProjects(
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
 
+  // Fallback fetch PM nếu nested embed null (PostgREST RLS quirk —
+  // customer view có thể không nhận được PM qua nested embed mặc dù
+  // policy 0039 đã cho phép). Batch lookup 1 round-trip.
+  const missingPmIds = Array.from(
+    new Set(
+      (data ?? [])
+        .filter((row) => {
+          const r = row as ProjectRow & {
+            pm: { id: string } | null;
+          };
+          return r.pm_id && !r.pm;
+        })
+        .map((row) => (row as ProjectRow).pm_id as string),
+    ),
+  );
+  let pmFallback = new Map<string, { id: string; full_name: string }>();
+  if (missingPmIds.length > 0) {
+    const { data: pmRows } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", missingPmIds);
+    pmFallback = new Map(
+      (pmRows ?? []).map((p) => [
+        p.id as string,
+        { id: p.id as string, full_name: p.full_name as string },
+      ]),
+    );
+  }
+
   const rows: ProjectListItem[] = (data ?? []).map((row) => {
     const r = row as ProjectRow & {
       company: { id: string; name: string } | null;
@@ -96,7 +125,7 @@ export async function listProjects(
       company: r.company,
       contract: r.contract,
       template: r.template,
-      pm: r.pm,
+      pm: r.pm ?? (r.pm_id ? pmFallback.get(r.pm_id) ?? null : null),
       milestone_count: r.milestones?.length ?? 0,
       task_count: r.tasks?.length ?? 0,
     };

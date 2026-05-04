@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, Loader2, Send } from "lucide-react";
+import { Loader2, Pencil, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   createEmailTemplateAndRedirect,
@@ -23,6 +22,11 @@ import {
   upsertEmailTemplateSchema,
   type UpsertEmailTemplateInput,
 } from "@/lib/validation/email";
+import { EmailEditor } from "@/components/email/email-editor";
+import {
+  LiveEmailPreview,
+  type PreviewVariable,
+} from "@/components/email/live-email-preview";
 
 export function EmailTemplateForm({
   mode,
@@ -35,7 +39,6 @@ export function EmailTemplateForm({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [view, setView] = useState<"edit" | "preview">("edit");
   const [testEmail, setTestEmail] = useState("");
   const [isSending, startSending] = useTransition();
 
@@ -43,6 +46,7 @@ export function EmailTemplateForm({
     register,
     handleSubmit,
     control,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<UpsertEmailTemplateInput>({
@@ -65,6 +69,14 @@ export function EmailTemplateForm({
   const placeholders = useMemo(
     () => extractPlaceholders(`${subject}\n${html}`),
     [subject, html],
+  );
+
+  // Build variable list cho preview với sample = `[name]`. Khi anh muốn
+  // sample thật hơn, có thể chỉnh trong "Biến mong đợi" section sau (MVP
+  // bỏ qua, giữ form đơn giản).
+  const previewVars: PreviewVariable[] = useMemo(
+    () => placeholders.map((name) => ({ name })),
+    [placeholders],
   );
 
   const onSubmit = (values: UpsertEmailTemplateInput) => {
@@ -98,7 +110,6 @@ export function EmailTemplateForm({
       toast.error("Cần lưu template trước khi test send");
       return;
     }
-    // Dummy vars for placeholders so preview email không có {{var}} thừa
     const dummy: Record<string, string> = {};
     for (const k of placeholders) dummy[k] = `[${k}]`;
     startSending(async () => {
@@ -117,6 +128,7 @@ export function EmailTemplateForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* ============ THÔNG TIN TEMPLATE ============ */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Mã template *" error={errors.code?.message}>
@@ -136,12 +148,6 @@ export function EmailTemplateForm({
             />
           </Field>
         </div>
-        <Field label="Tiêu đề email *" error={errors.subject?.message}>
-          <Input
-            {...register("subject")}
-            placeholder="Bạn được giao ticket {{ticket_code}}"
-          />
-        </Field>
         <Field
           label="Biến mong đợi (tuỳ chọn — ghi chú cho admin sau này)"
           error={errors.variables?.message}
@@ -166,94 +172,76 @@ export function EmailTemplateForm({
         />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-3">
-          <Label className="text-sm font-medium text-slate-700">
-            Nội dung HTML *
-          </Label>
-          <Tabs
-            value={view}
-            onValueChange={(v) => v && setView(v as typeof view)}
-          >
-            <TabsList className="rounded-md bg-slate-100 p-0.5">
-              <TabsTrigger
-                value="edit"
-                className="px-2.5 py-1 text-xs data-active:bg-white data-active:text-slate-900 data-active:shadow-sm"
-              >
-                Soạn
-              </TabsTrigger>
-              <TabsTrigger
-                value="preview"
-                className="px-2.5 py-1 text-xs data-active:bg-white data-active:text-slate-900 data-active:shadow-sm"
-              >
-                <Eye className="mr-1 inline h-3 w-3" />
-                Xem trước
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+      {/* ============ TIÊU ĐỀ EMAIL ============ */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            Tiêu đề email — hỗ trợ {"{{biến}}"}
+          </span>
         </div>
-        {view === "edit" ? (
-          <div className="p-6 space-y-4">
-            <Textarea
-              {...register("html_body")}
-              rows={16}
-              className={cn(
-                "font-mono text-xs leading-relaxed",
-                errors.html_body && "border-red-500",
-              )}
-              placeholder={`<p>Xin chào {{name}},</p>\n<p>Bạn được giao ticket <strong>{{ticket_code}}</strong>.</p>\n<p><a href="{{link}}">Mở ticket</a></p>`}
-            />
-            {errors.html_body && (
-              <p className="text-xs text-red-600">{errors.html_body.message}</p>
-            )}
-            <div>
-              <Label className="text-sm font-medium text-slate-700">
-                Phiên bản text (fallback cho client không hỗ trợ HTML)
-              </Label>
-              <Textarea
-                {...register("text_body")}
-                rows={5}
-                className="mt-1.5 font-mono text-xs"
-                placeholder="Xin chào {{name}}, bạn được giao ticket {{ticket_code}}. Mở ở: {{link}}"
-              />
-            </div>
-            {placeholders.length > 0 && (
-              <div className="rounded-md bg-slate-50 p-3 text-xs">
-                <span className="font-medium text-slate-700">
-                  Placeholder đang dùng:{" "}
-                </span>
-                {placeholders.map((p) => (
-                  <code
-                    key={p}
-                    className="mx-1 rounded bg-white px-1 py-0.5 font-mono text-slate-700 ring-1 ring-slate-200"
-                  >
-                    {`{{${p}}}`}
-                  </code>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-6">
-            <div className="mb-3 rounded-md bg-slate-50 p-3 text-sm">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                Tiêu đề
-              </p>
-              <p className="mt-0.5 font-medium text-slate-900">
-                {previewWithDummy(subject, placeholders)}
-              </p>
-            </div>
-            <div
-              className="prose prose-sm max-w-none rounded-md border border-slate-200 bg-white p-4"
-              dangerouslySetInnerHTML={{
-                __html: previewWithDummy(html, placeholders),
-              }}
-            />
-          </div>
+        <input
+          type="text"
+          {...register("subject")}
+          className={cn(
+            "w-full bg-white px-4 py-3 text-base font-medium text-slate-900 focus:bg-blue-50/30 focus:outline-none",
+            errors.subject && "border-red-500",
+          )}
+          placeholder="Subject email..."
+        />
+        {errors.subject && (
+          <p className="border-t border-slate-200 px-4 py-1.5 text-xs text-red-600">
+            {errors.subject.message}
+          </p>
         )}
       </div>
 
-      {/* Test send (chỉ ở edit mode khi đã có template_code lưu) */}
+      {/* ============ EDITOR | LIVE PREVIEW (split-view) ============ */}
+      <div className="grid gap-4 xl:grid-cols-[1fr_minmax(420px,520px)]">
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            <Pencil className="h-3 w-3" />
+            Soạn thảo
+          </div>
+          <Controller
+            control={control}
+            name="html_body"
+            render={({ field }) => (
+              <EmailEditor
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Nhập nội dung email — toolbar phía trên hỗ trợ heading / list / table / link / ảnh / màu / emoji..."
+              />
+            )}
+          />
+          {errors.html_body && (
+            <p className="text-xs text-red-600">{errors.html_body.message}</p>
+          )}
+        </div>
+
+        <div className="xl:sticky xl:top-4 xl:self-start">
+          <LiveEmailPreview
+            subject={subject}
+            htmlBody={html}
+            variables={previewVars}
+            minHeight="640px"
+          />
+        </div>
+      </div>
+
+      {/* ============ TEXT FALLBACK ============ */}
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <Label className="text-sm font-medium text-slate-700">
+          Phiên bản text (fallback cho client không hỗ trợ HTML)
+        </Label>
+        <Textarea
+          {...register("text_body")}
+          rows={4}
+          className="mt-1.5 font-mono text-xs"
+          placeholder="Xin chào {{name}}, bạn được giao ticket {{ticket_code}}. Mở ở: {{link}}"
+        />
+      </div>
+
+      {/* ============ TEST SEND (edit only) ============ */}
       {mode === "edit" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-6 space-y-3">
           <div>
@@ -337,15 +325,4 @@ function extractPlaceholders(source: string): string[] {
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) set.add(m[1]);
   return [...set].sort();
-}
-
-function previewWithDummy(source: string, placeholders: string[]): string {
-  let out = source;
-  for (const p of placeholders) {
-    out = out.replace(
-      new RegExp(`\\{\\{\\s*${p}\\s*\\}\\}`, "g"),
-      `[${p}]`,
-    );
-  }
-  return out;
 }

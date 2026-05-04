@@ -44,6 +44,8 @@ import {
 } from "@/lib/queries/tickets";
 import { getTaskStats, listTasks, type TaskListItem } from "@/lib/queries/tasks";
 import { listProjects } from "@/lib/queries/projects";
+import { listStaffFeedback } from "@/lib/queries/staff-feedback";
+import { StaffFeedbackPanel } from "@/components/dashboard/staff-feedback-panel";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -108,24 +110,27 @@ export default async function DashboardPage() {
   }
 
   // Staff (manager / staff / support / accountant) — "Việc của tôi" view:
-  // task được giao + ticket assignee. Support/staff thường có cả 2.
-  const [myTaskStats, myTasksResult, myTicketsResult] = await Promise.all([
-    getTaskStats({ assignee_id: userId }).catch(() => null),
-    listTasks({ assignee_id: userId, pageSize: 6 }).catch(() => ({
-      rows: [] as TaskListItem[],
-      total: 0,
-      page: 1,
-      pageSize: 6,
-    })),
-    listTickets({ assignee_id: userId, status: "open", pageSize: 5 }).catch(
-      () => ({
-        rows: [] as TicketListItem[],
+  // task được giao + ticket assignee + feedback inbox (comment từ admin/
+  // manager/khách trên milestone+task của staff trong 7 ngày).
+  const [myTaskStats, myTasksResult, myTicketsResult, feedbackItems] =
+    await Promise.all([
+      getTaskStats({ assignee_id: userId }).catch(() => null),
+      listTasks({ assignee_id: userId, pageSize: 6 }).catch(() => ({
+        rows: [] as TaskListItem[],
         total: 0,
         page: 1,
-        pageSize: 5,
-      }),
-    ),
-  ]);
+        pageSize: 6,
+      })),
+      listTickets({ assignee_id: userId, status: "open", pageSize: 5 }).catch(
+        () => ({
+          rows: [] as TicketListItem[],
+          total: 0,
+          page: 1,
+          pageSize: 5,
+        }),
+      ),
+      listStaffFeedback(userId).catch(() => []),
+    ]);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -134,6 +139,9 @@ export default async function DashboardPage() {
         breadcrumb={[{ label: "Trang chủ" }, { label: "Tổng quan" }]}
       />
       <StaffSummary stats={myTaskStats} />
+      {/* Feedback inbox — full width, đặt trên Tasks/Tickets để nhân viên
+          thấy ngay khi vào dashboard, không bỏ sót comment cần follow */}
+      <StaffFeedbackPanel items={feedbackItems} />
       <div className="grid gap-6 lg:grid-cols-2">
         <StaffRecentTasks rows={myTasksResult.rows} />
         <StaffRecentTickets rows={myTicketsResult.rows} />

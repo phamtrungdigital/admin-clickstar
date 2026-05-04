@@ -21,7 +21,10 @@ import {
   listSnapshotsForProject,
   readSnapshotPayload,
 } from "@/lib/queries/snapshots";
-import { listCommentsByMilestoneIds } from "@/lib/queries/milestones";
+import {
+  listActiveCompletionsByMilestoneIds,
+  listCommentsByMilestoneIds,
+} from "@/lib/queries/milestones";
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
 import { MilestoneCard } from "@/components/projects/milestone-card";
@@ -96,17 +99,24 @@ export default async function ProjectDetailPage({
     return <CustomerView projectId={project.id} project={project} />;
   }
 
-  // Load snapshots + milestone comments cùng lúc — milestones đã có sẵn
-  // trong project detail, comments load batch theo milestone IDs để tránh
-  // N+1 query.
+  // Load snapshots + milestone comments + active completions cùng lúc —
+  // milestones đã có sẵn trong project detail, dữ liệu phụ load batch theo
+  // milestone IDs (tránh N+1).
   const milestoneIds = project.milestones.map((m) => m.id);
-  const [snapshots, commentsByMilestone] = await Promise.all([
-    listSnapshotsForProject(project.id).catch(() => []),
-    listCommentsByMilestoneIds(milestoneIds).catch(
-      () => new Map<string, never[]>(),
-    ),
-  ]);
+  const [snapshots, commentsByMilestone, completionsByMilestone] =
+    await Promise.all([
+      listSnapshotsForProject(project.id).catch(() => []),
+      listCommentsByMilestoneIds(milestoneIds).catch(
+        () => new Map<string, never[]>(),
+      ),
+      listActiveCompletionsByMilestoneIds(milestoneIds).catch(
+        () => new Map(),
+      ),
+    ]);
   const stats = computeStats(project);
+  const isAdminLevel =
+    profile?.internal_role === "super_admin" ||
+    profile?.internal_role === "admin";
 
   return (
     <div className="space-y-6">
@@ -133,7 +143,10 @@ export default async function ProjectDetailPage({
             milestones={project.milestones}
             tasks={project.tasks}
             commentsByMilestone={commentsByMilestone}
+            completionsByMilestone={completionsByMilestone}
             currentUserId={userId}
+            companyId={project.company?.id ?? null}
+            isAdmin={isAdminLevel}
           />
           <TasksPreview tasks={project.tasks} />
           <ProjectDocumentsSection
@@ -483,12 +496,20 @@ function MilestonesSection({
   milestones,
   tasks,
   commentsByMilestone,
+  completionsByMilestone,
   currentUserId,
+  companyId,
+  isAdmin,
 }: {
   milestones: ProjectDetail["milestones"];
   tasks: ProjectDetail["tasks"];
   commentsByMilestone: Awaited<ReturnType<typeof listCommentsByMilestoneIds>>;
+  completionsByMilestone: Awaited<
+    ReturnType<typeof listActiveCompletionsByMilestoneIds>
+  >;
   currentUserId: string;
+  companyId: string | null;
+  isAdmin: boolean;
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
@@ -512,7 +533,10 @@ function MilestonesSection({
               milestone={m}
               tasks={tasks.filter((t) => t.milestone_id === m.id)}
               comments={commentsByMilestone.get(m.id) ?? []}
+              completion={completionsByMilestone.get(m.id) ?? null}
               currentUserId={currentUserId}
+              companyId={companyId}
+              isAdmin={isAdmin}
               isLast={idx === milestones.length - 1}
             />
           ))}

@@ -40,7 +40,12 @@ import {
   deleteMilestoneCommentAction,
   updateMilestoneAction,
 } from "@/app/(dashboard)/projects/[id]/milestone-actions";
-import type { MilestoneCommentItem } from "@/lib/queries/milestones";
+import { MilestoneCompleteDialog } from "./milestone-complete-dialog";
+import { MilestoneCompletionPanel } from "./milestone-completion-panel";
+import type {
+  MilestoneCommentItem,
+  MilestoneCompletionItem,
+} from "@/lib/queries/milestones";
 import type { MilestoneRow, TaskRow } from "@/lib/database.types";
 
 const STATUS_TONE: Record<
@@ -108,7 +113,14 @@ type Props = {
   /** Tasks thuộc milestone này (đã filter milestone_id ở parent) */
   tasks: TaskRow[];
   comments: MilestoneCommentItem[];
+  /** Active completion (nếu milestone đã được báo hoàn thành và chưa
+   *  bị undone/reopened). Render ra evidence panel ở phần expand. */
+  completion: MilestoneCompletionItem | null;
   currentUserId: string;
+  /** company_id để build storage path khi upload proof attachments. */
+  companyId: string | null;
+  /** super_admin / admin có nút "Mở lại" + được bypass quy tắc 5 phút. */
+  isAdmin: boolean;
   /** Index trong list, dùng để hide divider của item cuối */
   isLast: boolean;
 };
@@ -117,12 +129,17 @@ export function MilestoneCard({
   milestone,
   tasks,
   comments,
+  completion,
   currentUserId,
+  companyId,
+  isAdmin,
   isLast: _isLast,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const tone = STATUS_TONE[milestone.status] ?? STATUS_TONE.not_started;
+  const isCompleted = milestone.status === "completed" && completion !== null;
 
   return (
     <li className="relative">
@@ -206,24 +223,38 @@ export function MilestoneCard({
       {/* Expanded panel: edit form + tasks + comments */}
       {expanded && (
         <div className="mt-3 space-y-4 rounded-lg border border-slate-200 bg-slate-50/40 p-4">
-          {/* Edit/View toggle */}
-          {editing ? (
-            <MilestoneEditForm
-              milestone={milestone}
-              onCancel={() => setEditing(false)}
-              onSaved={() => setEditing(false)}
-            />
-          ) : (
-            <MilestoneSummary
-              milestone={milestone}
-              onStartEdit={() => setEditing(true)}
+          {/* Completion panel — hiện khi milestone đã được nghiệm thu */}
+          {isCompleted && completion && (
+            <MilestoneCompletionPanel
+              completion={completion}
+              milestoneId={milestone.id}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
             />
           )}
 
-          {/* Tasks trong milestone */}
-          {tasks.length > 0 && (
-            <MilestoneTasks tasks={tasks} />
+          {/* Edit/View toggle (ẩn khi đã completed — tránh đổi status nhầm,
+              admin muốn revert thì bấm "Mở lại" trong completion panel) */}
+          {!isCompleted && (
+            <>
+              {editing ? (
+                <MilestoneEditForm
+                  milestone={milestone}
+                  onCancel={() => setEditing(false)}
+                  onSaved={() => setEditing(false)}
+                />
+              ) : (
+                <MilestoneSummary
+                  milestone={milestone}
+                  onStartEdit={() => setEditing(true)}
+                  onMarkComplete={() => setCompleteDialogOpen(true)}
+                />
+              )}
+            </>
           )}
+
+          {/* Tasks trong milestone */}
+          {tasks.length > 0 && <MilestoneTasks tasks={tasks} />}
 
           {/* Thread bình luận */}
           <MilestoneComments
@@ -233,6 +264,16 @@ export function MilestoneCard({
           />
         </div>
       )}
+
+      {/* Dialog báo hoàn thành — render ngoài expanded để không unmount khi
+          panel close vì lỡ tay */}
+      <MilestoneCompleteDialog
+        milestoneId={milestone.id}
+        milestoneTitle={milestone.title}
+        companyId={companyId}
+        open={completeDialogOpen}
+        onClose={() => setCompleteDialogOpen(false)}
+      />
     </li>
   );
 }
@@ -240,9 +281,11 @@ export function MilestoneCard({
 function MilestoneSummary({
   milestone,
   onStartEdit,
+  onMarkComplete,
 }: {
   milestone: MilestoneRow;
   onStartEdit: () => void;
+  onMarkComplete: () => void;
 }) {
   return (
     <div className="space-y-3">
@@ -280,7 +323,7 @@ function MilestoneSummary({
           </span>
         </Field>
       </div>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           type="button"
           variant="outline"
@@ -289,6 +332,15 @@ function MilestoneSummary({
         >
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Chỉnh sửa
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          onClick={onMarkComplete}
+          className="bg-emerald-600 hover:bg-emerald-700"
+        >
+          <Check className="mr-1.5 h-3.5 w-3.5" />
+          Đánh dấu hoàn thành
         </Button>
       </div>
     </div>

@@ -2,15 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
+import type { ProfileRow } from "@/lib/database.types";
+
+function isAdminLevel(profile: ProfileRow | null): boolean {
+  if (!profile || profile.audience !== "internal") return false;
+  return (
+    profile.internal_role === "super_admin" ||
+    profile.internal_role === "admin"
+  );
+}
 import {
   addMilestoneCommentSchema,
+  completeMilestoneSchema,
+  reopenMilestoneSchema,
   updateMilestoneSchema,
+  UNDO_WINDOW_MINUTES,
   type AddMilestoneCommentInput,
+  type CompleteMilestoneInput,
+  type ReopenMilestoneInput,
   type UpdateMilestoneInput,
 } from "@/lib/validation/milestones";
 import { logAudit } from "@/lib/audit";
+import {
+  notifyMilestoneCompleted,
+  notifyMilestoneReopened,
+} from "@/lib/notifications/milestones";
 
 type ActionResult<T = void> =
   | { ok: true; data?: T }
@@ -159,3 +178,327 @@ export async function deleteMilestoneCommentAction(
   }
   return { ok: true };
 }
+
+// =============================================================================
+// Mark milestone as completed với evidence (summary + attachments + links)
+// =============================================================================
+
+export async function completeMilestoneAction(
+  milestoneId: string,
+  input: CompleteMilestoneInput,
+): Promise<ActionResult<{ completionId: string }>> {
+  const { id: userId, profile } = await getCurrentUser();
+  if (!isInternal(profile)) {
+    return { ok: false, message: "Không có quyền báo hoàn thành" };
+  }
+
+  const parsed = completeMilestoneSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      fieldErrors[issue.path.join(".")] = issue.message;
+    }
+    return { ok: false, message: "Dữ liệu chưa hợp lệ", fieldErrors };
+  }
+
+  const supabase = await createClient();
+
+  // Lấy milestone + project + company để build notification context
+  const { data: ms, error: msErr } = await supabase
+    .from("milestones")
+    .select(
+      `
+      id, title, status, project_id,
+      project:projects!milestones_project_id_fkey (
+        id, name, pm_id, company_id,
+        company:companies!projects_company_id_fkey (
+          id, name, primary_account_manager_id
+        )
+      )
+    `,
+    )
+    .eq("id", milestoneId)
+    .maybeSingle();
+  if (msErr || !ms) {
+    return { ok: false, message: "Không tìm thấy milestone" };
+  }
+
+  if (ms.status === "completed") {
+    return { ok: false, message: "Milestone đã ở trạng thái hoàn thành" };
+  }
+
+  // Insert completion row (RLS check: completed_by = auth.uid + access company)
+  const { data: completion, error: insErr } = await supabase
+    .from("milestone_completions")
+    .insert({
+      milestone_id: milestoneId,
+      completed_by: userId,
+      summary: parsed.data.summary,
+      attachments: parsed.data.attachments,
+      links: parsed.data.links,
+    })
+    .select("id, completed_at")
+    .single();
+
+  if (insErr) {
+    if (insErr.code === "23505") {
+      return {
+        ok: false,
+        message: "Milestone này đã có completion đang hoạt động",
+      };
+    }
+    return { ok: false, message: insErr.message };
+  }
+
+  // Update milestone status
+  const { error: updErr } = await supabase
+    .from("milestones")
+    .update({ status: "completed", progress_percent: 100 })
+    .eq("id", milestoneId);
+
+  if (updErr) {
+    // Rollback completion row nếu update fail (best effort)
+    await supabase
+      .from("milestone_completions")
+      .delete()
+      .eq("id", completion.id);
+    return { ok: false, message: updErr.message };
+  }
+
+  // Audit log
+  const project = (ms as unknown as {
+    project: {
+      id: string;
+      name: string;
+      pm_id: string | null;
+      company_id: string;
+      company: {
+        id: string;
+        name: string;
+        primary_account_manager_id: string | null;
+      } | null;
+    } | null;
+  }).project;
+
+  await logAudit({
+    user_id: userId,
+    company_id: project?.company_id ?? null,
+    action: "create",
+    entity_type: "milestone",
+    entity_id: milestoneId,
+    new_value: {
+      action: "completed",
+      summary: parsed.data.summary,
+      attachments_count: parsed.data.attachments.length,
+      links_count: parsed.data.links.length,
+    },
+  });
+
+  // Notify PM + AM + admin (in-app + email). Non-fatal.
+  if (project) {
+    await notifyMilestoneCompleted(
+      {
+        milestoneId,
+        milestoneTitle: ms.title as string,
+        projectId: project.id,
+        projectName: project.name,
+        companyId: project.company_id ?? null,
+        companyName: project.company?.name ?? null,
+        pmId: project.pm_id,
+        accountManagerId:
+          project.company?.primary_account_manager_id ?? null,
+        actorId: userId,
+        actorName: profile?.full_name || "(không rõ)",
+      },
+      {
+        summary: parsed.data.summary,
+        attachmentsCount: parsed.data.attachments.length,
+        linksCount: parsed.data.links.length,
+      },
+    ).catch((err) => {
+      console.error("[milestone-complete] notify failed", err);
+    });
+  }
+
+  revalidatePath(`/projects/${ms.project_id}`);
+  return { ok: true, data: { completionId: completion.id } };
+}
+
+/**
+ * Hoàn tác trong vòng UNDO_WINDOW_MINUTES — chỉ tác giả mới được làm.
+ * Set undone_at trên completion → unique partial index nhả chỗ → milestone
+ * có thể được mark complete lại sau. Reset milestone về status active.
+ */
+export async function undoMilestoneCompletionAction(
+  completionId: string,
+): Promise<ActionResult> {
+  const { id: userId, profile } = await getCurrentUser();
+  if (!isInternal(profile)) {
+    return { ok: false, message: "Không có quyền" };
+  }
+
+  const supabase = await createClient();
+  const { data: completion, error: getErr } = await supabase
+    .from("milestone_completions")
+    .select("id, milestone_id, completed_by, completed_at, undone_at")
+    .eq("id", completionId)
+    .maybeSingle();
+  if (getErr || !completion) {
+    return { ok: false, message: "Không tìm thấy completion" };
+  }
+  if (completion.undone_at) {
+    return { ok: false, message: "Đã hoàn tác trước đó" };
+  }
+  if (completion.completed_by !== userId) {
+    return { ok: false, message: "Chỉ người báo hoàn thành mới hoàn tác được" };
+  }
+  const completedAt = new Date(completion.completed_at as string);
+  const elapsedMin = (Date.now() - completedAt.getTime()) / 60_000;
+  if (elapsedMin > UNDO_WINDOW_MINUTES) {
+    return {
+      ok: false,
+      message: `Quá ${UNDO_WINDOW_MINUTES} phút để hoàn tác — vui lòng nhờ admin mở lại`,
+    };
+  }
+
+  const { error: undoErr } = await supabase
+    .from("milestone_completions")
+    .update({ undone_at: new Date().toISOString(), undone_by: userId })
+    .eq("id", completionId);
+  if (undoErr) return { ok: false, message: undoErr.message };
+
+  // Revert milestone về active + giữ progress 100% để user thấy là vừa
+  // hoàn tác xong (họ tự kéo về sau nếu cần).
+  const { error: revErr, data: ms } = await supabase
+    .from("milestones")
+    .update({ status: "active" })
+    .eq("id", completion.milestone_id)
+    .select("project_id")
+    .single();
+  if (revErr) return { ok: false, message: revErr.message };
+
+  await logAudit({
+    user_id: userId,
+    action: "update",
+    entity_type: "milestone",
+    entity_id: completion.milestone_id as string,
+    new_value: { action: "undone_completion" },
+  });
+
+  revalidatePath(`/projects/${ms.project_id}`);
+  return { ok: true };
+}
+
+/**
+ * Admin / super_admin mở lại 1 milestone đã hoàn thành. Bắt buộc nhập lý do.
+ * Notify lại cho người báo xong ban đầu.
+ */
+export async function reopenMilestoneAction(
+  milestoneId: string,
+  input: ReopenMilestoneInput,
+): Promise<ActionResult> {
+  const { id: userId, profile } = await getCurrentUser();
+  if (!isAdminLevel(profile)) {
+    return { ok: false, message: "Chỉ admin mới mở lại được milestone" };
+  }
+
+  const parsed = reopenMilestoneSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: "Lý do chưa hợp lệ" };
+  }
+
+  const supabase = await createClient();
+
+  // Tìm completion active hiện tại của milestone này
+  const { data: completion } = await supabase
+    .from("milestone_completions")
+    .select("id, completed_by")
+    .eq("milestone_id", milestoneId)
+    .is("undone_at", null)
+    .is("reopened_at", null)
+    .maybeSingle();
+
+  if (!completion) {
+    return { ok: false, message: "Milestone chưa có completion để mở lại" };
+  }
+
+  // Mark completion = reopened
+  const { error: rErr } = await supabase
+    .from("milestone_completions")
+    .update({
+      reopened_at: new Date().toISOString(),
+      reopened_by: userId,
+      reopen_reason: parsed.data.reason,
+    })
+    .eq("id", completion.id);
+  if (rErr) return { ok: false, message: rErr.message };
+
+  // Revert milestone về active
+  const { data: ms, error: msErr } = await supabase
+    .from("milestones")
+    .update({ status: "active" })
+    .eq("id", milestoneId)
+    .select(
+      `
+      id, title, project_id,
+      project:projects!milestones_project_id_fkey (
+        id, name, pm_id, company_id,
+        company:companies!projects_company_id_fkey (
+          id, name, primary_account_manager_id
+        )
+      )
+    `,
+    )
+    .single();
+  if (msErr || !ms) return { ok: false, message: msErr?.message ?? "fail" };
+
+  await logAudit({
+    user_id: userId,
+    action: "update",
+    entity_type: "milestone",
+    entity_id: milestoneId,
+    new_value: { action: "reopened", reason: parsed.data.reason },
+  });
+
+  // Notify người báo xong ban đầu
+  const project = (ms as unknown as {
+    project: {
+      id: string;
+      name: string;
+      pm_id: string | null;
+      company_id: string;
+      company: {
+        id: string;
+        name: string;
+        primary_account_manager_id: string | null;
+      } | null;
+    } | null;
+  }).project;
+  if (project) {
+    await notifyMilestoneReopened(
+      {
+        milestoneId,
+        milestoneTitle: ms.title as string,
+        projectId: project.id,
+        projectName: project.name,
+        companyId: project.company_id ?? null,
+        companyName: project.company?.name ?? null,
+        pmId: project.pm_id,
+        accountManagerId:
+          project.company?.primary_account_manager_id ?? null,
+        actorId: userId,
+        actorName: profile?.full_name || "(không rõ)",
+        originalCompleterId: completion.completed_by as string,
+      },
+      parsed.data.reason,
+    ).catch((err) => {
+      console.error("[milestone-reopen] notify failed", err);
+    });
+  }
+
+  revalidatePath(`/projects/${ms.project_id}`);
+  return { ok: true };
+}
+
+// Suppress unused import warnings (admin client reserved for future signed-URL helpers)
+void createAdminClient;

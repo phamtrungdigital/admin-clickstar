@@ -28,6 +28,11 @@ import {
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
 import { MilestoneCard } from "@/components/projects/milestone-card";
+import {
+  ProjectPmPicker,
+  type StaffOption,
+} from "@/components/projects/project-pm-picker";
+import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
 import { cn } from "@/lib/utils";
@@ -117,6 +122,23 @@ export default async function ProjectDetailPage({
   const isAdminLevel =
     profile?.internal_role === "super_admin" ||
     profile?.internal_role === "admin";
+  const canManagePm =
+    isAdminLevel || profile?.internal_role === "manager";
+
+  // Staff options cho PM picker — chỉ load khi user có quyền edit để
+  // tránh leak data cho staff thường.
+  let staffOptions: StaffOption[] = [];
+  if (canManagePm) {
+    const supabase = await createClient();
+    const { data: staffRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, internal_role")
+      .eq("audience", "internal")
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("full_name", { ascending: true });
+    staffOptions = (staffRows ?? []) as StaffOption[];
+  }
 
   return (
     <div className="space-y-6">
@@ -158,7 +180,11 @@ export default async function ProjectDetailPage({
           />
         </div>
         <div className="space-y-6">
-          <ProjectInfoCard project={project} />
+          <ProjectInfoCard
+            project={project}
+            staffOptions={staffOptions}
+            canManagePm={canManagePm}
+          />
         </div>
       </div>
     </div>
@@ -631,7 +657,15 @@ function TaskStatusBadge({ status }: { status: string }) {
   );
 }
 
-function ProjectInfoCard({ project }: { project: ProjectDetail }) {
+function ProjectInfoCard({
+  project,
+  staffOptions,
+  canManagePm,
+}: {
+  project: ProjectDetail;
+  staffOptions?: StaffOption[];
+  canManagePm?: boolean;
+}) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin dự án</h3>
@@ -645,7 +679,12 @@ function ProjectInfoCard({ project }: { project: ProjectDetail }) {
             : "—"}
         </Row>
         <Row icon={User} label="PM phụ trách">
-          {project.pm?.full_name ?? <span className="text-slate-400">Chưa gán</span>}
+          <ProjectPmPicker
+            projectId={project.id}
+            currentPm={project.pm}
+            staffOptions={staffOptions ?? []}
+            canManage={canManagePm ?? false}
+          />
         </Row>
         {project.contract && (
           <Row icon={Users} label="Hợp đồng">

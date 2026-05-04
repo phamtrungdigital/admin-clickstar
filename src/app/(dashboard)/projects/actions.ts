@@ -94,6 +94,55 @@ export async function updateProjectAction(
   return { ok: true };
 }
 
+/**
+ * Set hoặc clear PM của project. Chỉ admin/manager mới có quyền — staff
+ * thường không tự gán mình hay người khác làm PM.
+ */
+export async function setProjectPmAction(
+  projectId: string,
+  pmId: string | null,
+): Promise<ProjectActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const role = guard.profile.internal_role;
+  if (
+    role !== "super_admin" &&
+    role !== "admin" &&
+    role !== "manager"
+  ) {
+    return {
+      ok: false,
+      message: "Chỉ admin/manager mới gán được PM dự án",
+    };
+  }
+
+  const supabase = await createClient();
+  // Nếu set PM (không phải clear), verify pm_id phải là internal active
+  if (pmId) {
+    const { data: pm } = await supabase
+      .from("profiles")
+      .select("id, audience, is_active, deleted_at")
+      .eq("id", pmId)
+      .maybeSingle();
+    if (!pm || pm.audience !== "internal" || !pm.is_active || pm.deleted_at) {
+      return {
+        ok: false,
+        message: "Người được chọn không phải nhân viên nội bộ đang hoạt động",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ pm_id: pmId })
+    .eq("id", projectId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  return { ok: true };
+}
+
 export async function softDeleteProjectAction(
   id: string,
 ): Promise<ProjectActionResult> {

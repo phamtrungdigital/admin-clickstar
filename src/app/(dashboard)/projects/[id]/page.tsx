@@ -192,14 +192,26 @@ export default async function ProjectDetailPage({
 }
 
 async function CustomerView({
-  projectId,
+  projectId: _projectId,
   project,
 }: {
   projectId: string;
   project: ProjectDetail;
 }) {
-  const snapshot = await getLatestPublishedSnapshot(projectId).catch(() => null);
-  const payload = snapshot ? readSnapshotPayload(snapshot.payload) : null;
+  // Customer view giờ dùng LIVE data từ project.milestones thay vì
+  // snapshot — yêu cầu UX của anh: khách phải thấy đầy đủ tiến độ ngay
+  // khi nhân viên cập nhật, không cần chờ PM publish snapshot.
+  // Vẫn ẩn các thông tin internal: edit form, comment thread, evidence
+  // chi tiết của completion (proof file/link), tasks (đầu việc).
+  //
+  // Load active completions để biết milestone nào đã được nghiệm thu
+  // chính thức (chỉ hiện ngày hoàn thành + tên người báo, không lộ proof).
+  const milestoneIds = project.milestones.map((m) => m.id);
+  const completionsByMilestone = await listActiveCompletionsByMilestoneIds(
+    milestoneIds,
+  ).catch(() => new Map());
+
+  const stats = computeStats(project);
 
   return (
     <div className="space-y-6">
@@ -215,30 +227,147 @@ async function CustomerView({
         ]}
       />
 
-      {snapshot && payload ? (
-        <CustomerSnapshotBanner snapshot={snapshot} />
-      ) : (
-        <CustomerNoSnapshotBanner />
-      )}
-
-      {payload ? (
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <CustomerProgressOverview payload={payload} />
-            <CustomerMilestones milestones={payload.milestones} />
-            {/* CustomerTasksPreview bỏ — phương án C, khách chỉ thấy
-                "Công việc" (= milestones) cho gọn, đỡ nhầm lẫn 2 cấp. */}
-            <ProjectDocumentsSection
-              projectId={project.id}
-              canManage={false}
-            />
-          </div>
-          <div className="space-y-6">
-            <ProjectInfoCard project={project} />
-          </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <ProgressOverview project={project} stats={stats} />
+          <CustomerMilestonesLive
+            milestones={project.milestones}
+            completionsByMilestone={completionsByMilestone}
+          />
+          <ProjectDocumentsSection projectId={project.id} canManage={false} />
         </div>
-      ) : null}
+        <div className="space-y-6">
+          <ProjectInfoCard project={project} />
+        </div>
+      </div>
     </div>
+  );
+}
+
+/**
+ * Customer-facing milestone list — live data, ẩn internal details:
+ *   - KHÔNG hiện edit form / nút đánh dấu hoàn thành
+ *   - KHÔNG hiện comment thread (internal-only)
+ *   - KHÔNG hiện tasks (đầu việc, theo phương án C)
+ *   - KHÔNG lộ summary/proof của completion record
+ *   - CÓ hiện: code, title, date range, mô tả ngắn, status pill,
+ *     ngày hoàn thành (nếu đã nghiệm thu) và tên người phụ trách báo.
+ */
+function CustomerMilestonesLive({
+  milestones,
+  completionsByMilestone,
+}: {
+  milestones: ProjectDetail["milestones"];
+  completionsByMilestone: Awaited<
+    ReturnType<typeof listActiveCompletionsByMilestoneIds>
+  >;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            Tiến độ công việc
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Cập nhật trực tiếp khi đội ngũ Clickstar tiến hành công việc.
+          </p>
+        </div>
+        <span className="text-xs text-slate-500">
+          {milestones.length} công việc
+        </span>
+      </div>
+
+      {milestones.length === 0 ? (
+        <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+          Đội ngũ Clickstar chuẩn bị triển khai. Anh/chị sẽ thấy tiến độ chi
+          tiết tại đây ngay khi bắt đầu.
+        </p>
+      ) : (
+        <ol className="relative space-y-5 border-l border-slate-200 pl-6">
+          {milestones.map((m) => {
+            const tone = MILESTONE_TONE[m.status] ?? MILESTONE_TONE.not_started;
+            const completion = completionsByMilestone.get(m.id);
+            return (
+              <li key={m.id} className="relative">
+                <span
+                  className={cn(
+                    "absolute -left-[31px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white",
+                    tone.dot,
+                  )}
+                >
+                  {m.status === "completed" && (
+                    <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                  )}
+                </span>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {m.code && (
+                        <span className="mr-1.5 font-mono text-xs text-slate-500">
+                          {m.code}
+                        </span>
+                      )}
+                      {m.title}
+                    </p>
+                    {m.starts_at && m.ends_at && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {format(new Date(m.starts_at), "dd/MM")} —{" "}
+                        {format(new Date(m.ends_at), "dd/MM/yyyy")}
+                      </p>
+                    )}
+                    {m.description && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
+                        {m.description}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
+                      tone.pill,
+                    )}
+                  >
+                    {tone.label}
+                  </span>
+                </div>
+
+                {/* Progress bar khi đang thực hiện */}
+                {m.status === "active" && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-blue-500"
+                        style={{ width: `${m.progress_percent}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">
+                      {m.progress_percent}%
+                    </span>
+                  </div>
+                )}
+
+                {/* Khi đã hoàn thành: hiện 1 dòng "Đã nghiệm thu bởi
+                    [Tên] lúc [date]" — KHÔNG lộ summary/proof của
+                    completion (chỉ internal mới xem chi tiết). */}
+                {m.status === "completed" && completion && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                    <Check className="h-3 w-3" />
+                    Đã nghiệm thu
+                    {completion.completed_by?.full_name && (
+                      <>
+                        {" "}bởi <strong>{completion.completed_by.full_name}</strong>
+                      </>
+                    )}{" "}
+                    · {format(new Date(completion.completed_at), "dd/MM/yyyy")}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 

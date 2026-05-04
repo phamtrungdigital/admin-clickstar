@@ -503,6 +503,22 @@ export interface ReportRow extends Timestamps, SoftDeletable {
   created_by: string | null;
 }
 
+export type AiProvider = "anthropic" | "openai";
+
+export interface AiIntegrationRow extends Timestamps {
+  id: string;
+  provider: AiProvider;
+  model: string;
+  /** uuid trỏ vào vault.secrets — không bao giờ contain plaintext key. */
+  vault_secret_id: string;
+  /** Mask "sk-•••abc1" cho admin nhận diện trong UI. */
+  key_mask: string;
+  is_active: boolean;
+  label: string | null;
+  notes: string | null;
+  created_by: string | null;
+}
+
 export interface NotificationRow {
   id: string;
   user_id: string;
@@ -724,6 +740,12 @@ export interface Database {
         Row: ReportRow;
         Insert: Insertable<ReportRow>;
         Update: Updatable<ReportRow>;
+        Relationships: [];
+      };
+      ai_integrations: {
+        Row: AiIntegrationRow;
+        Insert: Insertable<AiIntegrationRow>;
+        Update: Updatable<AiIntegrationRow>;
         Relationships: [];
       };
       notifications: {

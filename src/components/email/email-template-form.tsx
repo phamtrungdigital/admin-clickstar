@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Pencil, Send } from "lucide-react";
+import { Loader2, Pencil, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
   LiveEmailPreview,
   type PreviewVariable,
 } from "@/components/email/live-email-preview";
+import { AiGenEmailDialog } from "@/components/email/ai-gen-email-dialog";
 
 export function EmailTemplateForm({
   mode,
@@ -41,6 +42,7 @@ export function EmailTemplateForm({
   const [isPending, startTransition] = useTransition();
   const [testEmail, setTestEmail] = useState("");
   const [isSending, startSending] = useTransition();
+  const [aiOpen, setAiOpen] = useState(false);
 
   const {
     register,
@@ -128,6 +130,18 @@ export function EmailTemplateForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setAiOpen(true)}
+          className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+        >
+          <Sparkles className="mr-1.5 h-4 w-4" />
+          Tạo bằng AI
+        </Button>
+      </div>
+
       {/* ============ THÔNG TIN TEMPLATE ============ */}
       <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
@@ -297,6 +311,30 @@ export function EmailTemplateForm({
           {mode === "create" ? "Tạo template" : "Lưu thay đổi"}
         </Button>
       </div>
+
+      <AiGenEmailDialog
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        onGenerated={(r) => {
+          if (
+            (subject || html) &&
+            !confirm(
+              `AI đã viết xong "${r.suggestedName}". Ghi đè subject + body hiện tại?`,
+            )
+          ) {
+            return;
+          }
+          setValue("subject", r.subject, { shouldDirty: true });
+          setValue("html_body", r.html, { shouldDirty: true });
+          if (mode === "create") {
+            setValue("name", r.suggestedName, { shouldDirty: true });
+            setValue("code", r.suggestedCode, { shouldDirty: true });
+          }
+          if (r.variableHint) {
+            setValue("variables", r.variableHint, { shouldDirty: true });
+          }
+        }}
+      />
     </form>
   );
 }

@@ -88,6 +88,48 @@ export async function forkTemplateCore(
   const startsAt = input.startsAt;
   const endsAt = addDays(startsAt, template.duration_days ?? 30);
 
+  // Auto-pick PM nếu caller không truyền: ưu tiên primary AM của
+  // company → AM bất kỳ → bất kỳ staff được assign company. Tránh
+  // project bị "Chưa gán" lúc khách view.
+  let resolvedPmId: string | null = input.pmId;
+  if (!resolvedPmId) {
+    // Primary AM
+    const { data: primaryAm } = await supabase
+      .from("company_assignments")
+      .select("internal_user_id")
+      .eq("company_id", contract.company_id)
+      .eq("role", "account_manager")
+      .eq("is_primary", true)
+      .limit(1)
+      .maybeSingle();
+    resolvedPmId = (primaryAm?.internal_user_id as string | null) ?? null;
+    // Bất kỳ AM
+    if (!resolvedPmId) {
+      const { data: anyAm } = await supabase
+        .from("company_assignments")
+        .select("internal_user_id")
+        .eq("company_id", contract.company_id)
+        .eq("role", "account_manager")
+        .limit(1)
+        .maybeSingle();
+      resolvedPmId = (anyAm?.internal_user_id as string | null) ?? null;
+    }
+    // Bất kỳ assignment
+    if (!resolvedPmId) {
+      const { data: anyStaff } = await supabase
+        .from("company_assignments")
+        .select("internal_user_id")
+        .eq("company_id", contract.company_id)
+        .limit(1)
+        .maybeSingle();
+      resolvedPmId = (anyStaff?.internal_user_id as string | null) ?? null;
+    }
+    // Fallback cuối cùng: người tạo project (admin/manager)
+    if (!resolvedPmId) {
+      resolvedPmId = userId;
+    }
+  }
+
   // 1) Create project
   const { data: project, error: pErr } = await supabase
     .from("projects")
@@ -96,7 +138,7 @@ export async function forkTemplateCore(
       contract_id: contract.id,
       template_id: template.id,
       template_version: template.version,
-      pm_id: input.pmId,
+      pm_id: resolvedPmId,
       name: input.name,
       starts_at: startsAt,
       ends_at: endsAt,

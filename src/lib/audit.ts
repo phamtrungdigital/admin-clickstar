@@ -22,6 +22,8 @@ export type AuditEntityType =
   | "service"
   | "task"
   | "ticket"
+  | "milestone"
+  | "milestone_comment"
   | "document"
   | "role_permission"
   | "system_settings";

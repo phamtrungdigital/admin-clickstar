@@ -21,8 +21,10 @@ import {
   listSnapshotsForProject,
   readSnapshotPayload,
 } from "@/lib/queries/snapshots";
+import { listCommentsByMilestoneIds } from "@/lib/queries/milestones";
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
+import { MilestoneCard } from "@/components/projects/milestone-card";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
 import { cn } from "@/lib/utils";
@@ -80,7 +82,7 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { profile } = await getCurrentUser();
+  const { id: userId, profile } = await getCurrentUser();
   const internal = isInternal(profile);
   const canApprove =
     internal &&
@@ -94,7 +96,16 @@ export default async function ProjectDetailPage({
     return <CustomerView projectId={project.id} project={project} />;
   }
 
-  const snapshots = await listSnapshotsForProject(project.id).catch(() => []);
+  // Load snapshots + milestone comments cùng lúc — milestones đã có sẵn
+  // trong project detail, comments load batch theo milestone IDs để tránh
+  // N+1 query.
+  const milestoneIds = project.milestones.map((m) => m.id);
+  const [snapshots, commentsByMilestone] = await Promise.all([
+    listSnapshotsForProject(project.id).catch(() => []),
+    listCommentsByMilestoneIds(milestoneIds).catch(
+      () => new Map<string, never[]>(),
+    ),
+  ]);
   const stats = computeStats(project);
 
   return (
@@ -118,7 +129,12 @@ export default async function ProjectDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <ProgressOverview project={project} stats={stats} />
-          <MilestonesSection milestones={project.milestones} />
+          <MilestonesSection
+            milestones={project.milestones}
+            tasks={project.tasks}
+            commentsByMilestone={commentsByMilestone}
+            currentUserId={userId}
+          />
           <TasksPreview tasks={project.tasks} />
           <ProjectDocumentsSection
             projectId={project.id}
@@ -465,8 +481,14 @@ function Stat({ label, value, dot }: { label: string; value: number; dot: string
 
 function MilestonesSection({
   milestones,
+  tasks,
+  commentsByMilestone,
+  currentUserId,
 }: {
   milestones: ProjectDetail["milestones"];
+  tasks: ProjectDetail["tasks"];
+  commentsByMilestone: Awaited<ReturnType<typeof listCommentsByMilestoneIds>>;
+  currentUserId: string;
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
@@ -474,7 +496,9 @@ function MilestonesSection({
         <h3 className="text-sm font-semibold text-slate-900">
           Các giai đoạn (Milestones)
         </h3>
-        <span className="text-xs text-slate-500">{milestones.length} giai đoạn</span>
+        <span className="text-xs text-slate-500">
+          {milestones.length} giai đoạn · click để mở chi tiết
+        </span>
       </div>
       {milestones.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
@@ -482,62 +506,16 @@ function MilestonesSection({
         </p>
       ) : (
         <ol className="relative space-y-5 border-l border-slate-200 pl-6">
-          {milestones.map((m) => {
-            const tone = MILESTONE_TONE[m.status] ?? MILESTONE_TONE.not_started;
-            return (
-              <li key={m.id} className="relative">
-                <span
-                  className={cn(
-                    "absolute -left-[31px] top-1 flex h-5 w-5 items-center justify-center rounded-full ring-4 ring-white",
-                    tone.dot,
-                  )}
-                >
-                  {m.status === "completed" && (
-                    <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                  )}
-                </span>
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {m.code && (
-                        <span className="mr-1.5 font-mono text-xs text-slate-500">
-                          {m.code}
-                        </span>
-                      )}
-                      {m.title}
-                    </p>
-                    {m.starts_at && m.ends_at && (
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {format(new Date(m.starts_at), "dd/MM")} —{" "}
-                        {format(new Date(m.ends_at), "dd/MM/yyyy")}
-                      </p>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
-                      tone.pill,
-                    )}
-                  >
-                    {tone.label}
-                  </span>
-                </div>
-                {m.status === "active" && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-blue-500"
-                        style={{ width: `${m.progress_percent}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium text-slate-600">
-                      {m.progress_percent}%
-                    </span>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {milestones.map((m, idx) => (
+            <MilestoneCard
+              key={m.id}
+              milestone={m}
+              tasks={tasks.filter((t) => t.milestone_id === m.id)}
+              comments={commentsByMilestone.get(m.id) ?? []}
+              currentUserId={currentUserId}
+              isLast={idx === milestones.length - 1}
+            />
+          ))}
         </ol>
       )}
     </section>

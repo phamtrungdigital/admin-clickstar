@@ -19,6 +19,9 @@ export type TicketListParams = {
   company_id?: string;
   /** Filter to tickets where this user is reporter (customer "my tickets"). */
   reporter_id?: string;
+  /** Filter to tickets where this user is the assignee (staff/support
+   *  "my queue"). */
+  assignee_id?: string;
   page?: number;
   pageSize?: number;
 };
@@ -84,6 +87,10 @@ export async function listTickets(
 
   if (params.reporter_id) {
     query = query.eq("reporter_id", params.reporter_id);
+  }
+
+  if (params.assignee_id) {
+    query = query.eq("assignee_id", params.assignee_id);
   }
 
   const { data, error, count } = await query;

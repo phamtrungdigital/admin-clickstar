@@ -107,8 +107,9 @@ export default async function DashboardPage() {
     );
   }
 
-  // Staff (manager / staff / support / accountant) — task-centric "Của tôi" view.
-  const [myTaskStats, myTasksResult] = await Promise.all([
+  // Staff (manager / staff / support / accountant) — "Việc của tôi" view:
+  // task được giao + ticket assignee. Support/staff thường có cả 2.
+  const [myTaskStats, myTasksResult, myTicketsResult] = await Promise.all([
     getTaskStats({ assignee_id: userId }).catch(() => null),
     listTasks({ assignee_id: userId, pageSize: 6 }).catch(() => ({
       rows: [] as TaskListItem[],
@@ -116,16 +117,27 @@ export default async function DashboardPage() {
       page: 1,
       pageSize: 6,
     })),
+    listTickets({ assignee_id: userId, status: "open", pageSize: 5 }).catch(
+      () => ({
+        rows: [] as TicketListItem[],
+        total: 0,
+        page: 1,
+        pageSize: 5,
+      }),
+    ),
   ]);
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Xin chào, ${greeting} 👋`}
-        description="Công việc và dự án anh/chị đang phụ trách."
+        description="Công việc và ticket anh/chị đang phụ trách."
         breadcrumb={[{ label: "Trang chủ" }, { label: "Tổng quan" }]}
       />
       <StaffSummary stats={myTaskStats} />
-      <StaffRecentTasks rows={myTasksResult.rows} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <StaffRecentTasks rows={myTasksResult.rows} />
+        <StaffRecentTickets rows={myTicketsResult.rows} />
+      </div>
     </div>
   );
 }
@@ -371,6 +383,76 @@ function StaffRecentTasks({ rows }: { rows: TaskListItem[] }) {
                 </TableRow>
               );
             })}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
+function StaffRecentTickets({ rows }: { rows: TicketListItem[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            Ticket của tôi
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Ticket đang mở mà bạn được phân công xử lý.
+          </p>
+        </div>
+        <Link
+          href="/tickets"
+          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          Xem tất cả →
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-12 text-center">
+          <MessageSquare className="mx-auto h-10 w-10 text-slate-300" />
+          <h4 className="mt-3 text-sm font-semibold text-slate-900">
+            Chưa có ticket được giao
+          </h4>
+          <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
+            Khi admin/manager assign ticket cho bạn, danh sách sẽ hiện ở đây.
+          </p>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ticket</TableHead>
+              <TableHead>Khách</TableHead>
+              <TableHead>Ưu tiên</TableHead>
+              <TableHead>Trạng thái</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  <Link
+                    href={`/tickets/${row.id}`}
+                    className="text-sm font-medium text-slate-900 hover:text-blue-700"
+                  >
+                    {row.title}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-sm text-slate-700">
+                  {row.company?.name ?? <span className="text-slate-400">—</span>}
+                </TableCell>
+                <TableCell className="text-sm text-slate-600 capitalize">
+                  {row.priority}
+                </TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+                    {row.status}
+                  </span>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       )}

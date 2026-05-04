@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -120,13 +121,16 @@ export default async function CustomersPage({
 function CustomerTable({ rows }: { rows: CustomerListItem[] }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Building2 className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">Chưa có khách hàng</h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Bấm <strong>Thêm khách hàng</strong> ở góc trên để tạo bản ghi đầu tiên.
-        </p>
-      </div>
+      <EmptyState
+        icon={Building2}
+        title="Chưa có khách hàng"
+        description={
+          <>
+            Bấm <strong>Thêm khách hàng</strong> ở góc trên để tạo bản ghi
+            đầu tiên.
+          </>
+        }
+      />
     );
   }
 

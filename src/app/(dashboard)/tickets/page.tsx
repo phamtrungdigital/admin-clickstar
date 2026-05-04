@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -178,15 +179,16 @@ function TicketTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <TicketIcon className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có ticket
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Bấm <strong>Thêm ticket</strong> ở góc trên để tạo ticket hỗ trợ mới.
-        </p>
-      </div>
+      <EmptyState
+        icon={TicketIcon}
+        title="Chưa có ticket"
+        description={
+          <>
+            Bấm <strong>Thêm ticket</strong> ở góc trên để tạo ticket hỗ
+            trợ mới.
+          </>
+        }
+      />
     );
   }
 

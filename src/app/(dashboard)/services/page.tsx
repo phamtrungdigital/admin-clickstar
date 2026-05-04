@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -163,15 +164,11 @@ export default async function ServicesPage({
 function CustomerServiceTable({ rows }: { rows: CustomerServiceItem[] }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Package className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có dịch vụ nào đang dùng
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Khi Clickstar kích hoạt dịch vụ trong hợp đồng, danh sách sẽ hiện ở đây.
-        </p>
-      </div>
+      <EmptyState
+        icon={Package}
+        title="Chưa có dịch vụ nào đang dùng"
+        description="Khi Clickstar kích hoạt dịch vụ trong hợp đồng, danh sách sẽ hiện ở đây."
+      />
     );
   }
 
@@ -219,22 +216,20 @@ function ServiceTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Package className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          {canManage ? "Chưa có dịch vụ" : "Chưa có dịch vụ nào đang dùng"}
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          {canManage ? (
+      <EmptyState
+        icon={Package}
+        title={canManage ? "Chưa có dịch vụ" : "Chưa có dịch vụ nào đang dùng"}
+        description={
+          canManage ? (
             <>
               Bấm <strong>Thêm dịch vụ</strong> ở góc trên để khai báo dịch vụ
               Clickstar cung cấp.
             </>
           ) : (
             "Khi Clickstar kích hoạt dịch vụ trong hợp đồng, danh sách sẽ hiện ở đây."
-          )}
-        </p>
-      </div>
+          )
+        }
+      />
     );
   }
 

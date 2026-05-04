@@ -41,7 +41,7 @@ export function AccountSettingsForm({
 }) {
   return (
     <Tabs defaultValue="profile" className="w-full">
-      <TabsList className="bg-white border border-slate-200 p-1">
+      <TabsList>
         <TabsTrigger value="profile">Hồ sơ</TabsTrigger>
         <TabsTrigger value="password">Mật khẩu</TabsTrigger>
       </TabsList>

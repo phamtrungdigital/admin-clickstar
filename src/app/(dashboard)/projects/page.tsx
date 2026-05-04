@@ -2,6 +2,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ChevronRight, FolderKanban, User } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { listProjects, type ProjectListItem } from "@/lib/queries/projects";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -58,7 +59,7 @@ export default async function ProjectsPage() {
           {loadError}
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState canManage={canManage} />
+        <ProjectsEmpty canManage={canManage} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {rows.map((project) => (
@@ -70,28 +71,26 @@ export default async function ProjectsPage() {
   );
 }
 
-function EmptyState({ canManage }: { canManage: boolean }) {
+function ProjectsEmpty({ canManage }: { canManage: boolean }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-      <FolderKanban className="mx-auto h-10 w-10 text-slate-300" />
-      <h3 className="mt-3 text-base font-semibold text-slate-900">
-        Chưa có dự án nào
-      </h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-        {canManage ? (
+    <EmptyState
+      icon={FolderKanban}
+      title="Chưa có dự án nào"
+      description={
+        canManage ? (
           <>
             Vào{" "}
             <Link href="/contracts" className="font-medium text-blue-700 hover:underline">
               Hợp đồng
             </Link>{" "}
             → mở 1 hợp đồng → bấm{" "}
-            <strong>"Tạo dự án từ template"</strong> để fork template thành dự án.
+            <strong>&quot;Tạo dự án từ template&quot;</strong> để fork template thành dự án.
           </>
         ) : (
           "Khi Clickstar triển khai dịch vụ cho doanh nghiệp bạn, dự án sẽ hiện ở đây."
-        )}
-      </p>
-    </div>
+        )
+      }
+    />
   );
 }
 

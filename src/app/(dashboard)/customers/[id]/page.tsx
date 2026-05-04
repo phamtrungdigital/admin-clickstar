@@ -132,7 +132,7 @@ export default async function CustomerDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Tabs defaultValue="info" className="w-full">
-            <TabsList className="bg-white border border-slate-200 p-1">
+            <TabsList>
               <TabsTrigger value="info">Thông tin</TabsTrigger>
               <TabsTrigger value="members">Tài khoản</TabsTrigger>
               {showContracts && (

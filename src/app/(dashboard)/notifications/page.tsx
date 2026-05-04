@@ -3,6 +3,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Bell, BellRing } from "lucide-react";
 
+import { EmptyState as EmptyStateUI } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -121,15 +122,10 @@ function NotificationRow({
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-      <Bell className="mx-auto h-10 w-10 text-slate-300" />
-      <h3 className="mt-3 text-base font-semibold text-slate-900">
-        Chưa có thông báo
-      </h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-        Khi có yêu cầu hỗ trợ mới hoặc cập nhật từ Clickstar, thông báo sẽ
-        hiển thị tại đây.
-      </p>
-    </div>
+    <EmptyStateUI
+      icon={Bell}
+      title="Chưa có thông báo"
+      description="Khi có yêu cầu hỗ trợ mới hoặc cập nhật từ Clickstar, thông báo sẽ hiển thị tại đây."
+    />
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Pagination } from "@/components/customers/pagination";
@@ -292,17 +293,15 @@ function TasksTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <ListChecks className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Không có task nào
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          {canViewAll
+      <EmptyState
+        icon={ListChecks}
+        title="Không có task nào"
+        description={
+          canViewAll
             ? "Khi PM tạo task hoặc fork template, danh sách sẽ hiện ở đây."
-            : "Hiện tại anh/chị chưa được giao task nào."}
-        </p>
-      </div>
+            : "Hiện tại anh/chị chưa được giao task nào."
+        }
+      />
     );
   }
   const nowIso = new Date().toISOString();

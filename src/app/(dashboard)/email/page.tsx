@@ -4,6 +4,7 @@ import { AlertCircle, Mail, Plus } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import {
   Tabs,
@@ -78,7 +79,7 @@ export default async function EmailPage() {
         <ErrorPanel message={loadError} />
       ) : (
         <Tabs defaultValue="templates">
-          <TabsList className="bg-white border border-slate-200 p-1">
+          <TabsList>
             <TabsTrigger value="templates">
               Templates ({templates.length})
             </TabsTrigger>
@@ -107,17 +108,15 @@ function TemplatesPanel({
 }) {
   if (templates.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Mail className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có template
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          {canManage
+      <EmptyState
+        icon={Mail}
+        title="Chưa có template"
+        description={
+          canManage
             ? "Bấm \"Tạo template\" để soạn email mẫu cho ticket / báo cáo / onboarding."
-            : "Khi Manager+ tạo template email, danh sách sẽ hiện ở đây."}
-        </p>
-      </div>
+            : "Khi Manager+ tạo template email, danh sách sẽ hiện ở đây."
+        }
+      />
     );
   }
   return (
@@ -196,16 +195,11 @@ const STATUS_LABEL: Record<string, string> = {
 function LogsPanel({ logs }: { logs: EmailLogListItem[] }) {
   if (logs.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <Mail className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có email nào được gửi
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Sau khi cài Resend API key + tạo template, email gửi qua hệ thống sẽ
-          hiện ở đây.
-        </p>
-      </div>
+      <EmptyState
+        icon={Mail}
+        title="Chưa có email nào được gửi"
+        description="Sau khi cài Resend API key + tạo template, email gửi qua hệ thống sẽ hiện ở đây."
+      />
     );
   }
   return (

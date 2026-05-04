@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -155,13 +156,11 @@ function TemplatesTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <ListTree className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có template nào
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          {canManage ? (
+      <EmptyState
+        icon={ListTree}
+        title="Chưa có template nào"
+        description={
+          canManage ? (
             <>
               Tạo template đầu tiên để chuẩn hoá quy trình một loại dịch vụ.
               Khi tạo hợp đồng, anh chọn template phù hợp → hệ thống auto-sinh
@@ -169,9 +168,9 @@ function TemplatesTable({
             </>
           ) : (
             "Quản trị viên chưa tạo template nào."
-          )}
-        </p>
-      </div>
+          )
+        }
+      />
     );
   }
   return (

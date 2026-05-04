@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { EmptyState as EmptyStateUI } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Pagination } from "@/components/customers/pagination";
 import { ActivityFilters } from "@/components/admin/activity-filters";
@@ -325,16 +326,11 @@ function describeChange(row: AuditListItem): string | null {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-      <ShieldUser className="mx-auto h-10 w-10 text-slate-300" />
-      <h3 className="mt-3 text-base font-semibold text-slate-900">
-        Chưa có hoạt động
-      </h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-        Khi có ai đó tạo / cập nhật / xoá dữ liệu hoặc đổi phân quyền, hệ thống
-        sẽ ghi vào đây.
-      </p>
-    </div>
+    <EmptyStateUI
+      icon={ShieldUser}
+      title="Chưa có hoạt động"
+      description="Khi có ai đó tạo / cập nhật / xoá dữ liệu hoặc đổi phân quyền, hệ thống sẽ ghi vào đây."
+    />
   );
 }
 

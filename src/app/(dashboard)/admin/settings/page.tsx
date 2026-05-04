@@ -36,7 +36,7 @@ export default async function SettingsPage() {
         ]}
       />
       <Tabs defaultValue="general">
-        <TabsList className="bg-white border border-slate-200 p-1">
+        <TabsList>
           <TabsTrigger value="general">Tổ chức & Thông báo</TabsTrigger>
           <TabsTrigger value="ai">
             Tích hợp AI ({aiIntegrations.length})

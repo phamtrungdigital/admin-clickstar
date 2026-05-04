@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -153,15 +154,15 @@ export default async function UsersPage({
 function UserTable({ rows }: { rows: UserListItem[] }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <UsersIcon className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có tài khoản
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Bấm <strong>Thêm tài khoản</strong> ở góc trên để tạo người dùng.
-        </p>
-      </div>
+      <EmptyState
+        icon={UsersIcon}
+        title="Chưa có tài khoản"
+        description={
+          <>
+            Bấm <strong>Thêm tài khoản</strong> ở góc trên để tạo người dùng.
+          </>
+        }
+      />
     );
   }
 

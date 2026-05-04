@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { AlertCircle, FileText, Plus } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Pagination } from "@/components/customers/pagination";
@@ -146,17 +147,15 @@ function DocumentsTable({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <FileText className="mx-auto h-10 w-10 text-slate-300" />
-        <h3 className="mt-3 text-base font-semibold text-slate-900">
-          Chưa có tài liệu
-        </h3>
-        <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          {canManage
+      <EmptyState
+        icon={FileText}
+        title="Chưa có tài liệu"
+        description={
+          canManage
             ? "Bấm \"Upload tài liệu\" để gắn hợp đồng, brief, file thiết kế cho khách."
-            : "Khi Clickstar chia sẻ tài liệu, danh sách sẽ hiện ở đây."}
-        </p>
-      </div>
+            : "Khi Clickstar chia sẻ tài liệu, danh sách sẽ hiện ở đây."
+        }
+      />
     );
   }
   return (

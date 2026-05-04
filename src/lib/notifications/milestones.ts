@@ -159,6 +159,88 @@ export async function notifyMilestoneCompleted(
 }
 
 /**
+ * Bắn in-app notification cho thành viên liên quan khi có comment mới
+ * trong milestone:
+ * - Người báo hoàn thành milestone (nếu có active completion) — quan
+ *   trọng nhất, vì có thể admin yêu cầu chỉnh
+ * - PM của project
+ * - Account Manager của company
+ * - Tất cả người đã comment trong thread trước đó (trừ actor)
+ *
+ * Dedup tự động qua Map. Không bắn email (comment có thể nhiều, dễ
+ * spam) — chỉ in-app noti.
+ */
+export async function notifyMilestoneCommented(
+  ctx: MilestoneNotificationContext,
+  commentBody: string,
+): Promise<void> {
+  const admin = createAdminClient();
+  const recipients = new Map<string, { user_id: string }>();
+
+  // 1) Người báo hoàn thành milestone (active completion)
+  const { data: completion } = await admin
+    .from("milestone_completions")
+    .select("completed_by")
+    .eq("milestone_id", ctx.milestoneId)
+    .is("undone_at", null)
+    .is("reopened_at", null)
+    .maybeSingle();
+  if (completion?.completed_by && completion.completed_by !== ctx.actorId) {
+    recipients.set(completion.completed_by as string, {
+      user_id: completion.completed_by as string,
+    });
+  }
+
+  // 2) PM của project
+  if (ctx.pmId && ctx.pmId !== ctx.actorId) {
+    recipients.set(ctx.pmId, { user_id: ctx.pmId });
+  }
+
+  // 3) Account Manager của company
+  if (ctx.accountManagerId && ctx.accountManagerId !== ctx.actorId) {
+    recipients.set(ctx.accountManagerId, { user_id: ctx.accountManagerId });
+  }
+
+  // 4) Thread participants — tất cả người đã comment trong milestone này
+  const { data: participants } = await admin
+    .from("milestone_comments")
+    .select("author_id")
+    .eq("milestone_id", ctx.milestoneId)
+    .is("deleted_at", null);
+  for (const p of participants ?? []) {
+    const uid = p.author_id as string;
+    if (uid && uid !== ctx.actorId) {
+      recipients.set(uid, { user_id: uid });
+    }
+  }
+
+  if (recipients.size === 0) return;
+
+  const link = milestoneUrl(ctx.projectId, ctx.milestoneId);
+  // Truncate body cho noti (giữ 120 ký tự đầu)
+  const preview =
+    commentBody.length > 120 ? commentBody.slice(0, 117) + "..." : commentBody;
+
+  const rows = Array.from(recipients.values()).map((r) => ({
+    user_id: r.user_id,
+    company_id: ctx.companyId,
+    channel: "in_app" as const,
+    title: `${ctx.actorName} đã bình luận: ${ctx.milestoneTitle}`,
+    body: preview,
+    link_url: link,
+    entity_type: "milestone",
+    entity_id: ctx.milestoneId,
+  }));
+
+  try {
+    const { error } = await admin.from("notifications").insert(rows);
+    if (error) console.error("[notifications/milestone-comment] insert failed", error);
+  } catch (err) {
+    console.error("[notifications/milestone-comment] unexpected", err);
+  }
+}
+
+/**
  * Notify cho người báo hoàn thành ban đầu khi admin mở lại milestone của họ.
  */
 export async function notifyMilestoneReopened(

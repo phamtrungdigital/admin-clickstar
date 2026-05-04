@@ -27,6 +27,7 @@ import {
 } from "@/lib/validation/milestones";
 import { logAudit } from "@/lib/audit";
 import {
+  notifyMilestoneCommented,
   notifyMilestoneCompleted,
   notifyMilestoneReopened,
 } from "@/lib/notifications/milestones";
@@ -127,14 +128,9 @@ export async function addMilestoneCommentAction(
   }
 
   const supabase = await createClient();
+  const adminClient = createAdminClient();
 
-  // Lookup project_id để revalidate
-  const { data: ms } = await supabase
-    .from("milestones")
-    .select("project_id")
-    .eq("id", parsed.data.milestone_id)
-    .maybeSingle();
-
+  // Insert comment (RLS check: author_id = auth.uid + access company)
   const { data, error } = await supabase
     .from("milestone_comments")
     .insert({
@@ -147,6 +143,60 @@ export async function addMilestoneCommentAction(
 
   if (error) {
     return { ok: false, message: error.message };
+  }
+
+  // Load full context cho notify (qua admin client — staff có thể không
+  // join nested companies được, cùng lý do trong completeMilestoneAction)
+  const { data: ms } = await adminClient
+    .from("milestones")
+    .select(
+      `
+      id, title, project_id,
+      project:projects!milestones_project_id_fkey (
+        id, name, pm_id, company_id,
+        company:companies!projects_company_id_fkey (
+          id, name, primary_account_manager_id
+        )
+      )
+    `,
+    )
+    .eq("id", parsed.data.milestone_id)
+    .maybeSingle();
+
+  // Notify cho người liên quan (non-fatal)
+  if (ms) {
+    const project = (ms as unknown as {
+      project: {
+        id: string;
+        name: string;
+        pm_id: string | null;
+        company_id: string;
+        company: {
+          id: string;
+          name: string;
+          primary_account_manager_id: string | null;
+        } | null;
+      } | null;
+    }).project;
+    if (project) {
+      await notifyMilestoneCommented(
+        {
+          milestoneId: parsed.data.milestone_id,
+          milestoneTitle: ms.title as string,
+          projectId: project.id,
+          projectName: project.name,
+          companyId: project.company_id ?? null,
+          companyName: project.company?.name ?? null,
+          pmId: project.pm_id,
+          accountManagerId: project.company?.primary_account_manager_id ?? null,
+          actorId: userId,
+          actorName: profile?.full_name || "(không rõ)",
+        },
+        parsed.data.body,
+      ).catch((err) => {
+        console.error("[milestone-comment] notify failed", err);
+      });
+    }
   }
 
   if (ms?.project_id) {

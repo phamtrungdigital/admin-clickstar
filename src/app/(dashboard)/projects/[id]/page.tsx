@@ -180,7 +180,11 @@ export default async function ProjectDetailPage({
             currentUserId={userId}
             companyId={project.company?.id ?? null}
             isAdmin={isAdminLevel}
-            canManage={canManagePm}
+            // Mọi internal user có access project đều thêm được công việc
+            // ad-hoc — RLS milestones_modify_internal đã gate. Đặc biệt
+            // cần cho staff được giao project (PM) khi triển khai service
+            // không-template (phương án C).
+            canManage={internal}
             schedulingMode={project.scheduling_mode}
           />
           {/* TasksPreview bỏ — phương án C, đầu việc chi tiết hiện trong

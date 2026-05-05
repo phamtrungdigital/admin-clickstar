@@ -9,7 +9,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/comments/mention-textarea";
+import { CommentBody } from "@/components/comments/comment-body";
 import { cn } from "@/lib/utils";
 import { addTicketCommentAction } from "@/app/(dashboard)/tickets/actions";
 import {
@@ -146,14 +147,15 @@ export function TicketComments({
         </div>
       ) : (
         <div className="space-y-3 border-t border-slate-200 px-6 py-4">
-          <Textarea
+          <MentionTextarea
             rows={4}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={setBody}
             onPaste={handlePaste}
+            enableMention={isInternalUser}
             placeholder={
               isInternalUser
-                ? "Nhập phản hồi cho khách hoặc note nội bộ. Có thể dán ảnh trực tiếp (Ctrl/Cmd+V)."
+                ? "Nhập phản hồi cho khách hoặc note nội bộ. Gõ @ để tag nhân viên. Có thể dán ảnh (Ctrl/Cmd+V)."
                 : "Nhập phản hồi của bạn cho đội Clickstar. Có thể dán ảnh trực tiếp (Ctrl/Cmd+V)."
             }
             disabled={isPending}
@@ -265,13 +267,13 @@ function CommentItem({
         </div>
         <div
           className={cn(
-            "mt-1.5 whitespace-pre-wrap rounded-lg p-3 text-sm leading-relaxed",
+            "mt-1.5 rounded-lg p-3 text-sm leading-relaxed",
             comment.is_internal
               ? "bg-amber-50/50 text-amber-900 ring-1 ring-inset ring-amber-100"
               : "bg-slate-50 text-slate-800",
           )}
         >
-          {comment.body}
+          <CommentBody body={comment.body} />
         </div>
         {attachments.length > 0 && (
           <div className="mt-2">

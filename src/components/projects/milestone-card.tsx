@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/comments/mention-textarea";
+import { CommentBody } from "@/components/comments/comment-body";
 import {
   Select,
   SelectContent,
@@ -642,19 +644,21 @@ function MilestoneComments({
                   )}
                 </div>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                {c.body}
-              </p>
+              <CommentBody
+                body={c.body}
+                currentUserId={currentUserId}
+                className="mt-1 text-sm text-slate-700"
+              />
             </li>
           ))}
         </ul>
       )}
       <div className="flex gap-2">
-        <Textarea
+        <MentionTextarea
           rows={2}
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Viết bình luận..."
+          onChange={setBody}
+          placeholder="Viết bình luận... gõ @ để tag nhân viên"
           disabled={isPending}
           className="resize-none"
         />

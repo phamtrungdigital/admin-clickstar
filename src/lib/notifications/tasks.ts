@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { stripMentionsToPlain } from "@/lib/mentions";
+import { notifyMentions } from "@/lib/notifications/mentions";
 
 type TaskNotificationContext = {
   taskId: string;
@@ -117,6 +119,88 @@ export async function notifyTaskReturned(
       entity_id: ctx.taskId,
     },
   ]);
+}
+
+/**
+ * Comment mới trong task → notify cho assignee + reviewer + reporter
+ * + admin/manager tier. Người được @mention nhận noti riêng (title "tag bạn").
+ */
+export async function notifyTaskCommented(
+  ctx: TaskNotificationContext,
+  actorId: string,
+  actorName: string,
+  body: string,
+): Promise<void> {
+  const linkUrl = link(ctx.taskId);
+
+  // 1) Mention noti riêng — return set userId đã noti để skip bên dưới
+  const mentionedIds = await notifyMentions({
+    actorId,
+    actorName,
+    entityLabel: `công việc "${ctx.taskTitle}"`,
+    entityType: "task",
+    entityId: ctx.taskId,
+    linkUrl,
+    companyId: ctx.companyId,
+    body,
+    alreadyNotifiedUserIds: new Set(),
+  });
+
+  const recipients = new Set<string>();
+
+  // 2) Stakeholders trực tiếp của task
+  for (const uid of [ctx.assigneeId, ctx.reviewerId, ctx.reporterId]) {
+    if (uid && uid !== actorId) recipients.add(uid);
+  }
+
+  // 3) Thread participants — tất cả người đã comment trong task
+  try {
+    const admin = createAdminClient();
+    const { data: participants } = await admin
+      .from("task_comments")
+      .select("author_id")
+      .eq("task_id", ctx.taskId);
+    for (const p of participants ?? []) {
+      const uid = p.author_id as string;
+      if (uid && uid !== actorId) recipients.add(uid);
+    }
+
+    // 4) Admin tier — luôn gồm super_admin + admin + manager
+    const { data: adminRows } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("audience", "internal")
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .in("internal_role", ["super_admin", "admin", "manager"]);
+    for (const r of adminRows ?? []) {
+      const uid = r.id as string;
+      if (uid && uid !== actorId) recipients.add(uid);
+    }
+  } catch (err) {
+    console.error("[notifyTaskCommented] load recipients failed", err);
+  }
+
+  // Loại bỏ user đã nhận noti @mention
+  for (const uid of mentionedIds) recipients.delete(uid);
+
+  if (recipients.size === 0) return;
+
+  const plain = stripMentionsToPlain(body);
+  const preview = plain.length > 120 ? plain.slice(0, 117) + "..." : plain;
+
+  await insertNotifications(
+    Array.from(recipients).map((uid) => ({
+      user_id: uid,
+      company_id: ctx.companyId,
+      channel: "in_app" as const,
+      title: `${actorName} đã bình luận: ${ctx.taskTitle}`,
+      body: preview,
+      link_url: linkUrl,
+      entity_type: "task",
+      entity_id: ctx.taskId,
+    })),
+  );
 }
 
 /** NV báo bị chặn → notify reviewer (hoặc reporter nếu không có reviewer). */

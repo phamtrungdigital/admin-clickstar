@@ -16,6 +16,8 @@ import {
   notify,
   type NotifyArgs,
 } from "@/lib/notifications";
+import { stripMentionsToPlain } from "@/lib/mentions";
+import { notifyMentions } from "@/lib/notifications/mentions";
 import { sendEmail } from "@/lib/email/send";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TicketStatus } from "@/lib/database.types";
@@ -514,17 +516,43 @@ export async function addTicketCommentAction(
     },
   });
 
+  // Mention noti riêng (chỉ cho internal user — customer không tag được).
+  // Trả về set userId đã noti để skip noti chung tránh duplicate.
+  const actorProfileForName = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const actorName =
+    (actorProfileForName.data?.full_name as string | null) ?? "Người dùng";
+  const mentionedIds = isCustomerCaller
+    ? new Set<string>()
+    : await notifyMentions({
+        actorId: user.id,
+        actorName,
+        entityLabel: `ticket "${ticket.title}"`,
+        entityType: "ticket",
+        entityId: ticketId,
+        linkUrl: `/tickets/${ticketId}`,
+        companyId: ticket.company_id as string,
+        body: parsed.data.body,
+        alreadyNotifiedUserIds: new Set(),
+      });
+
   // Notify the "other side": customer reply → notify assignee + admins.
   // Internal public reply → notify reporter (the customer who filed it).
   // Internal note → notify only assignee + admins, never customer.
-  const recipients = await ticketRecipients({
-    actorId: user.id,
-    assigneeId: ticket.assignee_id as string | null,
-    reporterId:
-      isInternalNote || isCustomerCaller
-        ? null
-        : (ticket.reporter_id as string | null),
-  });
+  const recipients = (
+    await ticketRecipients({
+      actorId: user.id,
+      assigneeId: ticket.assignee_id as string | null,
+      reporterId:
+        isInternalNote || isCustomerCaller
+          ? null
+          : (ticket.reporter_id as string | null),
+    })
+  ).filter((rid) => !mentionedIds.has(rid));
+  const previewPlain = stripMentionsToPlain(parsed.data.body).slice(0, 200);
   const notifyArgs: NotifyArgs[] = recipients.map((rid) => ({
     user_id: rid,
     company_id: ticket.company_id as string,
@@ -533,7 +561,7 @@ export async function addTicketCommentAction(
       : isInternalNote
         ? `Note nội bộ: ${ticket.title}`
         : `Phản hồi mới: ${ticket.title}`,
-    body: parsed.data.body.slice(0, 200),
+    body: previewPlain,
     link_url: `/tickets/${ticketId}`,
     entity_type: "ticket",
     entity_id: ticketId,
@@ -550,7 +578,7 @@ export async function addTicketCommentAction(
       const actorProfile = await loadProfilesForEmail([user.id]);
       const actorName =
         actorProfile.get(user.id)?.full_name ?? "Người dùng";
-      const replyExcerpt = parsed.data.body.slice(0, 200);
+      const replyExcerpt = stripMentionsToPlain(parsed.data.body).slice(0, 200);
       for (const rid of recipients) {
         const profile = profiles.get(rid);
         if (!profile?.email) continue;

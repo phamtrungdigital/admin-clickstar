@@ -2,6 +2,8 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { stripMentionsToPlain } from "@/lib/mentions";
+import { notifyMentions } from "@/lib/notifications/mentions";
 
 type Recipient = {
   user_id: string;
@@ -175,9 +177,43 @@ export async function notifyMilestoneCommented(
   commentBody: string,
 ): Promise<void> {
   const admin = createAdminClient();
+  const link = milestoneUrl(ctx.projectId, ctx.milestoneId);
+
+  // Bước 1: notify riêng cho người được @mention với title "tag bạn".
+  // Trả về set userId đã noti — recipient list mặc định sẽ skip những
+  // user này để tránh nhận 2 noti cho cùng 1 comment.
+  const mentionedIds = await notifyMentions({
+    actorId: ctx.actorId,
+    actorName: ctx.actorName,
+    entityLabel: `công việc "${ctx.milestoneTitle}"`,
+    entityType: "milestone",
+    entityId: ctx.milestoneId,
+    linkUrl: link,
+    companyId: ctx.companyId,
+    body: commentBody,
+    alreadyNotifiedUserIds: new Set(),
+  });
+
   const recipients = new Map<string, { user_id: string }>();
 
-  // 1) Người báo hoàn thành milestone (active completion)
+  // 1) super_admin + admin (và manager) — bug fix 2026-05-05: trước đây
+  //    chỉ noti khi admin tình cờ là PM/AM. Giờ luôn loop in admin tier
+  //    để bất kỳ comment nào trong milestone admin cũng nhận được.
+  const { data: adminRows } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("audience", "internal")
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .in("internal_role", ["super_admin", "admin", "manager"]);
+  for (const r of adminRows ?? []) {
+    const uid = r.id as string;
+    if (uid && uid !== ctx.actorId) {
+      recipients.set(uid, { user_id: uid });
+    }
+  }
+
+  // 2) Người báo hoàn thành milestone (active completion)
   const { data: completion } = await admin
     .from("milestone_completions")
     .select("completed_by")
@@ -191,17 +227,17 @@ export async function notifyMilestoneCommented(
     });
   }
 
-  // 2) PM của project
+  // 3) PM của project
   if (ctx.pmId && ctx.pmId !== ctx.actorId) {
     recipients.set(ctx.pmId, { user_id: ctx.pmId });
   }
 
-  // 3) Account Manager của company
+  // 4) Account Manager của company
   if (ctx.accountManagerId && ctx.accountManagerId !== ctx.actorId) {
     recipients.set(ctx.accountManagerId, { user_id: ctx.accountManagerId });
   }
 
-  // 4) Thread participants — tất cả người đã comment trong milestone này
+  // 5) Thread participants — tất cả người đã comment trong milestone này
   const { data: participants } = await admin
     .from("milestone_comments")
     .select("author_id")
@@ -214,7 +250,7 @@ export async function notifyMilestoneCommented(
     }
   }
 
-  // 5) Task assignees + reviewers — staff đang làm các đầu việc trong
+  // 6) Task assignees + reviewers — staff đang làm các đầu việc trong
   // milestone này (cover trường hợp staff chưa báo xong + chưa comment
   // nhưng đang phụ trách phần việc của milestone đó).
   const { data: tasks } = await admin
@@ -230,29 +266,14 @@ export async function notifyMilestoneCommented(
     }
   }
 
-  // 6) Fallback cuối: nếu vẫn không có recipient (vd milestone chưa có
-  // task + chưa có completion + admin là người duy nhất) → notify tất
-  // cả internal staff được assigned company của project. Đảm bảo team
-  // luôn nắm được feedback ngay cả khi phân công chưa hoàn thiện.
-  if (recipients.size === 0 && ctx.companyId) {
-    const { data: assigned } = await admin
-      .from("company_assignments")
-      .select("internal_user_id")
-      .eq("company_id", ctx.companyId);
-    for (const a of assigned ?? []) {
-      const uid = a.internal_user_id as string;
-      if (uid && uid !== ctx.actorId) {
-        recipients.set(uid, { user_id: uid });
-      }
-    }
-  }
+  // Loại bỏ những user đã nhận noti @mention — tránh duplicate.
+  for (const uid of mentionedIds) recipients.delete(uid);
 
   if (recipients.size === 0) return;
 
-  const link = milestoneUrl(ctx.projectId, ctx.milestoneId);
-  // Truncate body cho noti (giữ 120 ký tự đầu)
-  const preview =
-    commentBody.length > 120 ? commentBody.slice(0, 117) + "..." : commentBody;
+  // Truncate body cho noti (giữ 120 ký tự đầu) — strip mention markup.
+  const plain = stripMentionsToPlain(commentBody);
+  const preview = plain.length > 120 ? plain.slice(0, 117) + "..." : plain;
 
   const rows = Array.from(recipients.values()).map((r) => ({
     user_id: r.user_id,

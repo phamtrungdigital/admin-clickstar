@@ -9,7 +9,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/comments/mention-textarea";
+import { CommentBody } from "@/components/comments/comment-body";
 import { cn } from "@/lib/utils";
 import {
   addCustomerTaskCommentAction,
@@ -156,9 +157,10 @@ function CommentRow({
               </span>
             )}
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-            {comment.body}
-          </p>
+          <CommentBody
+            body={comment.body}
+            className="mt-1 text-sm text-slate-700"
+          />
         </div>
       </div>
     </li>
@@ -217,15 +219,16 @@ function CommentComposer({
           : "border-emerald-200 bg-emerald-50/30",
       )}
     >
-      <Textarea
+      <MentionTextarea
         rows={3}
         placeholder={
           targetChannel === "internal"
-            ? "Bình luận nội bộ — chỉ team Clickstar thấy..."
+            ? "Bình luận nội bộ — gõ @ để tag nhân viên..."
             : "Bình luận cho khách — khách hàng sẽ thấy..."
         }
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={setBody}
+        enableMention={canPostInternal}
         className="bg-white"
       />
       <div className="mt-2 flex items-center justify-between">

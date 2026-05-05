@@ -9,6 +9,7 @@ import {
   notifyTaskApproved,
   notifyTaskAssigned,
   notifyTaskBlocked,
+  notifyTaskCommented,
   notifyTaskReturned,
   notifyTaskSubmittedForReview,
 } from "@/lib/notifications/tasks";
@@ -751,6 +752,13 @@ export async function addTaskCommentAction(
   if (error || !data) {
     return { ok: false, message: error?.message ?? "Không gửi được bình luận" };
   }
+
+  await notifyTaskCommentRecipients(
+    taskId,
+    user.id,
+    parsed.data.body,
+  ).catch((err) => console.error("[task-comment] notify failed", err));
+
   revalidatePath(`/tasks/${taskId}`);
   return { ok: true, data: { id: data.id } };
 }
@@ -786,6 +794,60 @@ export async function addCustomerTaskCommentAction(
   if (error || !data) {
     return { ok: false, message: error?.message ?? "Không gửi được bình luận" };
   }
+
+  await notifyTaskCommentRecipients(taskId, user.id, trimmed).catch((err) =>
+    console.error("[task-comment-customer] notify failed", err),
+  );
+
   revalidatePath(`/tasks/${taskId}`);
   return { ok: true, data: { id: data.id } };
+}
+
+/**
+ * Helper: load task context + actor profile rồi gọi notifyTaskCommented.
+ * Tách ra để cả internal + customer comment dùng chung.
+ */
+async function notifyTaskCommentRecipients(
+  taskId: string,
+  actorId: string,
+  body: string,
+): Promise<void> {
+  const supabase = await createClient();
+  const { data: task } = await supabase
+    .from("tasks")
+    .select(
+      `
+      id, title, project_id, company_id, assignee_id, reviewer_id, reporter_id,
+      project:projects!tasks_project_id_fkey ( id, name )
+    `,
+    )
+    .eq("id", taskId)
+    .maybeSingle();
+  if (!task) return;
+
+  const { data: actor } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", actorId)
+    .maybeSingle();
+
+  const project = (task as unknown as {
+    project: { id: string; name: string } | null;
+  }).project;
+
+  await notifyTaskCommented(
+    {
+      taskId: task.id as string,
+      taskTitle: (task.title as string) ?? "(không tiêu đề)",
+      projectId: project?.id ?? null,
+      projectName: project?.name ?? null,
+      companyId: (task.company_id as string) ?? "",
+      assigneeId: (task.assignee_id as string | null) ?? null,
+      reviewerId: (task.reviewer_id as string | null) ?? null,
+      reporterId: (task.reporter_id as string | null) ?? null,
+    },
+    actorId,
+    (actor?.full_name as string | null) ?? "(không rõ)",
+    body,
+  );
 }

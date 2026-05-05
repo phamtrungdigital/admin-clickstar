@@ -22,6 +22,64 @@ export type ActionResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; message: string; fieldErrors?: Record<string, string> };
 
+export type CustomerCascadeCounts = {
+  projects: number;
+  tasks: number;
+  tickets: number;
+  contracts: number;
+  documents: number;
+};
+
+/**
+ * Đếm trước số entity sẽ bị cascade khi soft-delete KH. Dùng để confirm
+ * dialog hiện cho admin biết phạm vi ảnh hưởng. Bypass RLS qua admin
+ * client để đảm bảo count chính xác kể cả khi caller không có quyền
+ * read trực tiếp các entity (vd manager khác chi nhánh).
+ */
+export async function getCustomerCascadeCounts(
+  companyId: string,
+): Promise<CustomerCascadeCounts> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) {
+    return { projects: 0, tasks: 0, tickets: 0, contracts: 0, documents: 0 };
+  }
+  const admin = createAdminClient();
+  const [p, t, tk, c, d] = await Promise.all([
+    admin
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
+    admin
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
+    admin
+      .from("tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
+    admin
+      .from("contracts")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
+    admin
+      .from("documents")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
+  ]);
+  return {
+    projects: p.count ?? 0,
+    tasks: t.count ?? 0,
+    tickets: tk.count ?? 0,
+    contracts: c.count ?? 0,
+    documents: d.count ?? 0,
+  };
+}
+
 function flattenZodErrors(error: import("zod").ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
@@ -330,7 +388,9 @@ export async function updateCustomerAction(
   return { ok: true };
 }
 
-export async function softDeleteCustomerAction(id: string): Promise<ActionResult> {
+export async function softDeleteCustomerAction(
+  id: string,
+): Promise<ActionResult<{ cascade: CustomerCascadeCounts }>> {
   const guard = await requireInternalAction();
   if (!guard.ok) return { ok: false, message: guard.message };
   // Soft-delete is sensitive — restrict to manager/admin/super_admin even
@@ -342,6 +402,11 @@ export async function softDeleteCustomerAction(id: string): Promise<ActionResult
         "Bạn không có quyền xoá khách hàng. Vui lòng liên hệ Manager hoặc Admin.",
     };
   }
+  // Đếm trước để báo cho user biết đã cascade bao nhiêu (toast sau khi
+  // xoá thành công). Trigger DB cascade_company_soft_delete tự xoá theo
+  // — code ở đây chỉ để đếm.
+  const cascade = await getCustomerCascadeCounts(id);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -358,10 +423,15 @@ export async function softDeleteCustomerAction(id: string): Promise<ActionResult
     action: "delete",
     entity_type: "company",
     entity_id: id,
+    new_value: { cascade },
   });
 
   revalidatePath("/customers");
-  return { ok: true };
+  revalidatePath("/projects");
+  revalidatePath("/tickets");
+  revalidatePath("/contracts");
+  revalidatePath("/documents");
+  return { ok: true, data: { cascade } };
 }
 
 export async function createCustomerAndRedirect(

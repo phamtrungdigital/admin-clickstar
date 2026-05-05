@@ -12,7 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { softDeleteCustomerAction } from "@/app/(dashboard)/customers/actions";
+import {
+  getCustomerCascadeCounts,
+  softDeleteCustomerAction,
+} from "@/app/(dashboard)/customers/actions";
 
 export function CustomerRowMenu({
   id,
@@ -25,19 +28,50 @@ export function CustomerRowMenu({
   const [isPending, startTransition] = useTransition();
 
   const onDelete = () => {
-    if (
-      !window.confirm(
-        `Xác nhận xoá khách hàng "${name}"? Bản ghi sẽ chuyển sang trạng thái đã xoá (có thể khôi phục).`,
-      )
-    )
-      return;
     startTransition(async () => {
+      // Đếm trước trong cùng transition để confirm dialog hiện đúng số.
+      const counts = await getCustomerCascadeCounts(id);
+      const total =
+        counts.projects +
+        counts.tasks +
+        counts.tickets +
+        counts.contracts +
+        counts.documents;
+
+      const cascadeLines: string[] = [];
+      if (counts.projects > 0)
+        cascadeLines.push(`• ${counts.projects} dự án`);
+      if (counts.tasks > 0) cascadeLines.push(`• ${counts.tasks} công việc`);
+      if (counts.tickets > 0) cascadeLines.push(`• ${counts.tickets} ticket`);
+      if (counts.contracts > 0)
+        cascadeLines.push(`• ${counts.contracts} hợp đồng`);
+      if (counts.documents > 0)
+        cascadeLines.push(`• ${counts.documents} tài liệu`);
+
+      const cascadeBlock =
+        total > 0
+          ? `\n\nCẢNH BÁO: cũng sẽ xoá theo:\n${cascadeLines.join("\n")}`
+          : "";
+
+      const ok = window.confirm(
+        `Xác nhận xoá khách hàng "${name}"?${cascadeBlock}\n\nBản ghi chuyển sang trạng thái đã xoá (có thể khôi phục bởi admin).`,
+      );
+      if (!ok) return;
+
       const result = await softDeleteCustomerAction(id);
       if (!result.ok) {
         toast.error(result.message);
         return;
       }
-      toast.success("Đã xoá khách hàng");
+      const c = result.data?.cascade;
+      const cascadeTotal = c
+        ? c.projects + c.tasks + c.tickets + c.contracts + c.documents
+        : 0;
+      toast.success(
+        cascadeTotal > 0
+          ? `Đã xoá khách hàng + ${cascadeTotal} mục liên quan`
+          : "Đã xoá khách hàng",
+      );
       router.refresh();
     });
   };

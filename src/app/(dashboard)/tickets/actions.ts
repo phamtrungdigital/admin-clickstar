@@ -12,6 +12,7 @@ import {
   type UpdateTicketInput,
 } from "@/lib/validation/tickets";
 import {
+  filterInternalActiveIds,
   listTicketSupportRecipientIds,
   notify,
   type NotifyArgs,
@@ -539,9 +540,8 @@ export async function addTicketCommentAction(
         alreadyNotifiedUserIds: new Set(),
       });
 
-  // Notify the "other side": customer reply → notify assignee + admins.
-  // Internal public reply → notify reporter (the customer who filed it).
-  // Internal note → notify only assignee + admins, never customer.
+  // Recipients chung (gồm reporter là KH khi internal reply public) —
+  // dùng cho EMAIL phía dưới để KH vẫn nhận thông báo qua hộp thư.
   const recipients = (
     await ticketRecipients({
       actorId: user.id,
@@ -552,8 +552,13 @@ export async function addTicketCommentAction(
           : (ticket.reporter_id as string | null),
     })
   ).filter((rid) => !mentionedIds.has(rid));
+
+  // Chuông in-app: chỉ internal user mới nhận (policy product). KH
+  // không bao giờ nhận chuông cho ticket comment — họ check qua email
+  // hoặc mở portal thấy reply trong thread.
+  const chuongRecipients = await filterInternalActiveIds(recipients);
   const previewPlain = stripMentionsToPlain(parsed.data.body).slice(0, 200);
-  const notifyArgs: NotifyArgs[] = recipients.map((rid) => ({
+  const notifyArgs: NotifyArgs[] = chuongRecipients.map((rid) => ({
     user_id: rid,
     company_id: ticket.company_id as string,
     title: isCustomerCaller

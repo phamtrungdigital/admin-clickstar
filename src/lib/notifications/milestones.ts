@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { stripMentionsToPlain } from "@/lib/mentions";
+import { filterInternalActiveIds } from "@/lib/notifications";
 import { notifyMentions } from "@/lib/notifications/mentions";
 
 type Recipient = {
@@ -271,12 +272,20 @@ export async function notifyMilestoneCommented(
 
   if (recipients.size === 0) return;
 
+  // Defensive filter: milestone là internal-only (RLS gate is_internal)
+  // nên về lý thuyết list đã 100% internal, nhưng filter thêm tránh
+  // edge case (vd: task.assignee bị set sai sang KH).
+  const internalIds = await filterInternalActiveIds(
+    Array.from(recipients.keys()),
+  );
+  if (internalIds.length === 0) return;
+
   // Truncate body cho noti (giữ 120 ký tự đầu) — strip mention markup.
   const plain = stripMentionsToPlain(commentBody);
   const preview = plain.length > 120 ? plain.slice(0, 117) + "..." : plain;
 
-  const rows = Array.from(recipients.values()).map((r) => ({
-    user_id: r.user_id,
+  const rows = internalIds.map((uid) => ({
+    user_id: uid,
     company_id: ctx.companyId,
     channel: "in_app" as const,
     title: `${ctx.actorName} đã bình luận: ${ctx.milestoneTitle}`,

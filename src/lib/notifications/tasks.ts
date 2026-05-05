@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stripMentionsToPlain } from "@/lib/mentions";
+import { filterInternalActiveIds } from "@/lib/notifications";
 import { notifyMentions } from "@/lib/notifications/mentions";
 
 type TaskNotificationContext = {
@@ -186,11 +187,19 @@ export async function notifyTaskCommented(
 
   if (recipients.size === 0) return;
 
+  // Policy: chỉ internal nhận chuông in-app cho task comment. Reporter
+  // có thể là KH (KH report task), thread participants có thể bao gồm
+  // KH (KH bình luận trước đó). Filter để KH không bị spam chuông.
+  const internalOnlyIds = await filterInternalActiveIds(
+    Array.from(recipients),
+  );
+  if (internalOnlyIds.length === 0) return;
+
   const plain = stripMentionsToPlain(body);
   const preview = plain.length > 120 ? plain.slice(0, 117) + "..." : plain;
 
   await insertNotifications(
-    Array.from(recipients).map((uid) => ({
+    internalOnlyIds.map((uid) => ({
       user_id: uid,
       company_id: ctx.companyId,
       channel: "in_app" as const,

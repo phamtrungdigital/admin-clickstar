@@ -69,6 +69,38 @@ export async function listTicketSupportRecipientIds(): Promise<string[]> {
   ]);
 }
 
+/**
+ * Lọc danh sách userId, chỉ giữ lại những user có audience='internal'
+ * + is_active + chưa soft-delete. Dùng cho chuông in-app: theo policy
+ * nội bộ, KH không bao giờ nhận chuông từ comment (chỉ nhận email cho
+ * ticket public reply). Internal-only ngăn KH bị spam chuông và tránh
+ * leak metadata internal-only.
+ */
+export async function filterInternalActiveIds(
+  ids: string[],
+): Promise<string[]> {
+  if (ids.length === 0) return [];
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id")
+      .in("id", ids)
+      .eq("audience", "internal")
+      .eq("is_active", true)
+      .is("deleted_at", null);
+    if (error) {
+      console.error("[notifications] filterInternalActiveIds failed", error);
+      return [];
+    }
+    const allowed = new Set((data ?? []).map((r) => r.id as string));
+    return ids.filter((id) => allowed.has(id));
+  } catch (err) {
+    console.error("[notifications] filterInternalActiveIds unexpected", err);
+    return [];
+  }
+}
+
 async function listInternalRecipientIdsByRoles(
   roles: string[],
 ): Promise<string[]> {

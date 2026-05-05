@@ -610,23 +610,26 @@ function MilestoneComments({
   };
 
   return (
-    <div className="space-y-3 border-t border-slate-200 pt-3">
+    <div className="space-y-2 border-t border-slate-200 pt-3">
       <p className="text-xs font-semibold text-slate-700">
         Bình luận ({comments.length})
       </p>
       {comments.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="divide-y divide-slate-100">
           {comments.map((c) => (
             <li
               key={c.id}
-              className="rounded-md border border-slate-200 bg-white p-3"
+              className="flex gap-2.5 py-2 first:pt-0 last:pb-0"
             >
-              <div className="flex items-baseline justify-between gap-2">
-                <p className="text-xs font-medium text-slate-900">
-                  {c.author?.full_name ?? "(không rõ)"}
-                </p>
-                <div className="flex items-center gap-2">
-                  <time className="text-[11px] text-slate-500">
+              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700">
+                {initials(c.author?.full_name ?? "?")}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="text-xs font-semibold text-slate-900">
+                    {c.author?.full_name ?? "(không rõ)"}
+                  </span>
+                  <time className="text-[10px] text-slate-400">
                     {format(new Date(c.created_at), "HH:mm · dd/MM/yyyy", {
                       locale: vi,
                     })}
@@ -635,7 +638,7 @@ function MilestoneComments({
                     <button
                       type="button"
                       onClick={() => remove(c.id)}
-                      className="text-slate-400 hover:text-rose-600"
+                      className="ml-auto text-slate-300 hover:text-rose-600"
                       aria-label="Xoá bình luận"
                       disabled={isPending}
                     >
@@ -643,17 +646,17 @@ function MilestoneComments({
                     </button>
                   )}
                 </div>
+                <CommentBody
+                  body={c.body}
+                  currentUserId={currentUserId}
+                  className="text-sm leading-snug text-slate-700"
+                />
               </div>
-              <CommentBody
-                body={c.body}
-                currentUserId={currentUserId}
-                className="mt-1 text-sm text-slate-700"
-              />
             </li>
           ))}
         </ul>
       )}
-      <div className="flex gap-2">
+      <div className="relative">
         <MentionTextarea
           rows={2}
           value={body}
@@ -662,14 +665,15 @@ function MilestoneComments({
           onMentionsChange={setMentions}
           placeholder="Viết bình luận... gõ @ để tag nhân viên"
           disabled={isPending}
-          className="resize-none"
+          className="resize-none pr-11"
         />
         <Button
           type="button"
           size="sm"
           onClick={submit}
           disabled={isPending || !body.trim()}
-          className="self-end bg-blue-600 hover:bg-blue-700"
+          className="absolute bottom-1.5 right-1.5 h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700"
+          aria-label="Gửi bình luận"
         >
           {isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -680,6 +684,16 @@ function MilestoneComments({
       </div>
     </div>
   );
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(-2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
 }
 
 function Field({

@@ -9,8 +9,6 @@ const PUBLIC_PATHS = [
   // showing the login page or before iOS's add-to-home-screen request).
   "/icon",
   "/apple-icon",
-  // TEMP debug endpoint — remove after diagnosing notify chain
-  "/api/debug",
 ];
 
 // Routes a `customer` audience may visit. Anything else (e.g. /contracts,

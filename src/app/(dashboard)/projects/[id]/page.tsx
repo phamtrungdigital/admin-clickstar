@@ -16,17 +16,17 @@ import {
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { getProjectById, type ProjectDetail } from "@/lib/queries/projects";
-import {
-  getLatestPublishedSnapshot,
-  listSnapshotsForProject,
-  readSnapshotPayload,
-} from "@/lib/queries/snapshots";
+// Phương án A: snapshot mechanism deprecated — customer view live không
+// còn gọi getLatestPublishedSnapshot/listSnapshotsForProject. Giữ
+// readSnapshotPayload type-only cho các function _Customer* unused
+// (prefix _) phòng khi cần restore snapshot mode sau.
+import { readSnapshotPayload } from "@/lib/queries/snapshots";
 import {
   listActiveCompletionsByMilestoneIds,
   listCommentsByMilestoneIds,
   listCustomerCompletionMetaByProject,
 } from "@/lib/queries/milestones";
-import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
+// import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
 import { MilestoneCard } from "@/components/projects/milestone-card";
 import { AddMilestoneButton } from "@/components/projects/add-milestone-button";
@@ -98,10 +98,6 @@ export default async function ProjectDetailPage({
   const { id } = await params;
   const { id: userId, profile } = await getCurrentUser();
   const internal = isInternal(profile);
-  const canApprove =
-    internal &&
-    (profile?.internal_role === "super_admin" ||
-      profile?.internal_role === "admin");
 
   const project = await getProjectById(id).catch(() => null);
   if (!project) notFound();
@@ -110,20 +106,17 @@ export default async function ProjectDetailPage({
     return <CustomerView projectId={project.id} project={project} />;
   }
 
-  // Load snapshots + milestone comments + active completions cùng lúc —
-  // milestones đã có sẵn trong project detail, dữ liệu phụ load batch theo
-  // milestone IDs (tránh N+1).
+  // Phương án A: snapshot mechanism deprecated — customer view giờ là
+  // LIVE, không qua snapshot.payload nữa. Bỏ load snapshots + bỏ panel
+  // UI để giảm noise cho PM/admin. Data table snapshots vẫn giữ (audit
+  // history); cron auto-publish được unschedule trong migration 0044.
   const milestoneIds = project.milestones.map((m) => m.id);
-  const [snapshots, commentsByMilestone, completionsByMilestone] =
-    await Promise.all([
-      listSnapshotsForProject(project.id).catch(() => []),
-      listCommentsByMilestoneIds(milestoneIds).catch(
-        () => new Map<string, never[]>(),
-      ),
-      listActiveCompletionsByMilestoneIds(milestoneIds).catch(
-        () => new Map(),
-      ),
-    ]);
+  const [commentsByMilestone, completionsByMilestone] = await Promise.all([
+    listCommentsByMilestoneIds(milestoneIds).catch(
+      () => new Map<string, never[]>(),
+    ),
+    listActiveCompletionsByMilestoneIds(milestoneIds).catch(() => new Map()),
+  ]);
   const stats = computeStats(project);
   const isAdminLevel =
     profile?.internal_role === "super_admin" ||
@@ -158,11 +151,9 @@ export default async function ProjectDetailPage({
         ]}
       />
 
-      <SnapshotsPanel
-        projectId={project.id}
-        snapshots={snapshots}
-        canApprove={canApprove}
-      />
+      {/* SnapshotsPanel deprecated (Phương án A): customer view giờ là
+          LIVE, không gate qua snapshot. Component + data table vẫn giữ
+          để rollback dễ nếu sau cần. */}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

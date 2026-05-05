@@ -55,8 +55,10 @@ export async function forkTemplateAction(
     contractId: parsed.data.contract_id,
     templateId: parsed.data.template_id,
     name: parsed.data.name,
-    startsAt: parsed.data.starts_at,
+    // Manual/rolling modes có thể bỏ trống starts_at — fork core handle null
+    startsAt: parsed.data.starts_at || new Date().toISOString().slice(0, 10),
     pmId: parsed.data.pm_id,
+    schedulingMode: parsed.data.scheduling_mode,
   });
   if (!result.ok) return result;
 
@@ -91,6 +93,44 @@ export async function updateProjectAction(
   if (error) return { ok: false, message: error.message };
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);
+  return { ok: true };
+}
+
+/**
+ * Đổi scheduling mode của project (auto/manual/rolling). Chỉ admin/
+ * manager mới có quyền vì việc đổi có thể ảnh hưởng tới hiển thị cho
+ * khách (vd. từ "Vận hành liên tục" sang "Tự động" sẽ require dates).
+ *
+ * Note: chỉ đổi flag, KHÔNG tự reset/regenerate dates của milestones.
+ * Nếu admin chuyển auto → manual: dates milestone giữ nguyên (admin có
+ * thể clear thủ công). Nếu chuyển manual → auto: dates vẫn null cho
+ * tới khi admin set thủ công cho từng milestone.
+ */
+export async function setProjectSchedulingModeAction(
+  projectId: string,
+  mode: "auto" | "manual" | "rolling",
+): Promise<ProjectActionResult> {
+  const guard = await requireInternalAction();
+  if (!guard.ok) return { ok: false, message: guard.message };
+  const role = guard.profile.internal_role;
+  if (
+    role !== "super_admin" &&
+    role !== "admin" &&
+    role !== "manager"
+  ) {
+    return {
+      ok: false,
+      message: "Chỉ admin/manager mới đổi được loại lịch trình",
+    };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("projects")
+    .update({ scheduling_mode: mode })
+    .eq("id", projectId);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
   return { ok: true };
 }
 

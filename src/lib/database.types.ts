@@ -237,9 +237,12 @@ export interface ProjectRow extends Timestamps, SoftDeletable {
   template_version: number | null;
   pm_id: string | null;
   progress_percent: number;
+  scheduling_mode: SchedulingMode;
   metadata: Json;
   created_by: string | null;
 }
+
+export type SchedulingMode = "auto" | "manual" | "rolling";
 
 export interface TaskRow extends Timestamps, SoftDeletable {
   id: string;

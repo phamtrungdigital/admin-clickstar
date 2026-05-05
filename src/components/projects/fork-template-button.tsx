@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { forkTemplateAction } from "@/app/(dashboard)/projects/actions";
+import { SCHEDULING_MODE_OPTIONS } from "@/lib/validation/projects";
+import { cn } from "@/lib/utils";
 
 export type TemplateOption = {
   id: string;
@@ -59,6 +61,9 @@ export function ForkTemplateButton({
     new Date().toISOString().slice(0, 10),
   );
   const [pmId, setPmId] = useState<string>("");
+  const [schedulingMode, setSchedulingMode] = useState<
+    "auto" | "manual" | "rolling"
+  >("auto");
 
   const onTemplateChange = (id: string | null) => {
     if (!id) return;
@@ -81,6 +86,7 @@ export function ForkTemplateButton({
         name,
         starts_at: startsAt,
         pm_id: pmId || null,
+        scheduling_mode: schedulingMode,
       });
       if (!result.ok) {
         toast.error(result.message);
@@ -159,17 +165,57 @@ export function ForkTemplateButton({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label className="text-sm font-medium text-slate-700">Ngày bắt đầu *</Label>
-              <Input
-                className="mt-1.5"
-                type="date"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-              />
+          {/* Scheduling mode picker */}
+          <div>
+            <Label className="text-sm font-medium text-slate-700">
+              Loại lịch trình *
+            </Label>
+            <div className="mt-1.5 grid gap-2">
+              {SCHEDULING_MODE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSchedulingMode(opt.value)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all",
+                    schedulingMode === opt.value
+                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200"
+                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "h-3 w-3 rounded-full border-2",
+                        schedulingMode === opt.value
+                          ? "border-blue-600 bg-blue-600"
+                          : "border-slate-300",
+                      )}
+                    />
+                    <p className="text-sm font-medium text-slate-900">
+                      {opt.label}
+                    </p>
+                  </div>
+                  <p className="mt-1 pl-5 text-xs text-slate-500">{opt.hint}</p>
+                </button>
+              ))}
             </div>
-            <div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {schedulingMode === "auto" && (
+              <div>
+                <Label className="text-sm font-medium text-slate-700">
+                  Ngày bắt đầu *
+                </Label>
+                <Input
+                  className="mt-1.5"
+                  type="date"
+                  value={startsAt}
+                  onChange={(e) => setStartsAt(e.target.value)}
+                />
+              </div>
+            )}
+            <div className={schedulingMode !== "auto" ? "sm:col-span-2" : ""}>
               <Label className="text-sm font-medium text-slate-700">PM phụ trách</Label>
               <Select
                 value={pmId || "none"}

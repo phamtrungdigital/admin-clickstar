@@ -33,6 +33,10 @@ import {
   ProjectPmPicker,
   type StaffOption,
 } from "@/components/projects/project-pm-picker";
+import {
+  ProjectSchedulingModePicker,
+  SchedulingModeBadge,
+} from "@/components/projects/project-scheduling-mode-picker";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
@@ -161,7 +165,11 @@ export default async function ProjectDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <ProgressOverview project={project} stats={stats} />
+          {project.scheduling_mode === "rolling" ? (
+            <RollingOverview stats={stats} />
+          ) : (
+            <ProgressOverview project={project} stats={stats} />
+          )}
           <MilestonesSection
             milestones={project.milestones}
             tasks={project.tasks}
@@ -248,10 +256,15 @@ async function CustomerView({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <ProgressOverview project={projectWithPm} stats={stats} />
+          {projectWithPm.scheduling_mode === "rolling" ? (
+            <RollingOverview stats={stats} />
+          ) : (
+            <ProgressOverview project={projectWithPm} stats={stats} />
+          )}
           <CustomerMilestonesLive
             milestones={projectWithPm.milestones}
             completionMetaByMilestone={completionMetaByMilestone}
+            schedulingMode={projectWithPm.scheduling_mode}
           />
           <ProjectDocumentsSection projectId={projectWithPm.id} canManage={false} />
         </div>
@@ -260,6 +273,52 @@ async function CustomerView({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Overview cho project rolling (vận hành liên tục): ẩn donut tiến độ %,
+ * thay bằng counter công việc + thông điệp "Dự án ongoing không có
+ * deadline cuối — Clickstar liên tục triển khai theo nhu cầu của khách."
+ */
+function RollingOverview({
+  stats,
+}: {
+  stats: ReturnType<typeof computeStats>;
+}) {
+  return (
+    <section className="rounded-xl border border-violet-200 bg-violet-50/30 p-6">
+      <div className="mb-4 flex items-start gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">
+            Dự án vận hành liên tục
+          </h3>
+          <p className="mt-0.5 text-sm text-slate-600">
+            Đây là dự án ongoing — Clickstar liên tục triển khai theo nhu cầu
+            của khách, không có deadline cuối.
+          </p>
+        </div>
+      </div>
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat label="Đã hoàn thành" value={stats.done} dot="bg-emerald-500" />
+        <Stat label="Đang thực hiện" value={stats.doing} dot="bg-blue-500" />
+        <Stat label="Sắp tới" value={stats.pending} dot="bg-slate-300" />
+      </dl>
+    </section>
   );
 }
 
@@ -275,12 +334,16 @@ async function CustomerView({
 function CustomerMilestonesLive({
   milestones,
   completionMetaByMilestone,
+  schedulingMode,
 }: {
   milestones: ProjectDetail["milestones"];
   completionMetaByMilestone: Awaited<
     ReturnType<typeof listCustomerCompletionMetaByProject>
   >;
+  schedulingMode: ProjectDetail["scheduling_mode"];
 }) {
+  // Rolling/manual: không hiện ngày cho từng milestone (vì có thể null)
+  const showDates = schedulingMode === "auto";
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-5 flex items-center justify-between">
@@ -329,7 +392,7 @@ function CustomerMilestonesLive({
                       )}
                       {m.title}
                     </p>
-                    {m.starts_at && m.ends_at && (
+                    {showDates && m.starts_at && m.ends_at && (
                       <p className="mt-0.5 text-xs text-slate-500">
                         {format(new Date(m.starts_at), "dd/MM")} —{" "}
                         {format(new Date(m.ends_at), "dd/MM/yyyy")}
@@ -819,6 +882,8 @@ function ProjectInfoCard({
   staffOptions?: StaffOption[];
   canManagePm?: boolean;
 }) {
+  const mode = project.scheduling_mode;
+  const showDates = mode === "auto";
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5">
       <h3 className="mb-3 text-sm font-semibold text-slate-900">Thông tin dự án</h3>
@@ -826,11 +891,24 @@ function ProjectInfoCard({
         <Row icon={Info} label="Trạng thái">
           {STATUS_LABEL[project.status] ?? project.status}
         </Row>
-        <Row icon={CalendarRange} label="Thời gian">
-          {project.starts_at && project.ends_at
-            ? `${format(new Date(project.starts_at), "dd/MM/yyyy")} — ${format(new Date(project.ends_at), "dd/MM/yyyy")}`
-            : "—"}
+        <Row icon={CalendarRange} label="Loại lịch trình">
+          {canManagePm ? (
+            <ProjectSchedulingModePicker
+              projectId={project.id}
+              currentMode={mode}
+              canManage
+            />
+          ) : (
+            <SchedulingModeBadge mode={mode} />
+          )}
         </Row>
+        {showDates && (
+          <Row icon={CalendarRange} label="Thời gian">
+            {project.starts_at && project.ends_at
+              ? `${format(new Date(project.starts_at), "dd/MM/yyyy")} — ${format(new Date(project.ends_at), "dd/MM/yyyy")}`
+              : "—"}
+          </Row>
+        )}
         <Row icon={User} label="PM phụ trách">
           <ProjectPmPicker
             projectId={project.id}

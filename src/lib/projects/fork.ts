@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logAudit } from "@/lib/audit";
+import type { SchedulingMode } from "@/lib/database.types";
 
 export type ForkTemplateCoreInput = {
   contractId: string;
@@ -10,6 +11,12 @@ export type ForkTemplateCoreInput = {
   name: string;
   startsAt: string; // 'yyyy-MM-dd'
   pmId: string | null;
+  /** Cách lên lịch dự án (PRD §5 Phương án B):
+   *   - auto (default): tính ngày từ template offset
+   *   - manual: copy structure, dates = NULL → PM tự set sau
+   *   - rolling: dự án ongoing/retainer, không deadline cuối, UI ẩn date
+   * Optional — undefined = auto. */
+  schedulingMode?: SchedulingMode;
 };
 
 export type ForkTemplateCoreResult =
@@ -85,8 +92,15 @@ export async function forkTemplateCore(
     tplChecklists = (cl ?? []) as typeof tplChecklists;
   }
 
-  const startsAt = input.startsAt;
-  const endsAt = addDays(startsAt, template.duration_days ?? 30);
+  const schedulingMode: SchedulingMode = input.schedulingMode ?? "auto";
+  const isAuto = schedulingMode === "auto";
+
+  // Project-level dates: chỉ set khi auto. Manual + rolling → null
+  // (PM tự set sau hoặc dự án ongoing không có deadline).
+  const startsAt = isAuto ? input.startsAt : null;
+  const endsAt = isAuto
+    ? addDays(input.startsAt, template.duration_days ?? 30)
+    : null;
 
   // Auto-pick PM nếu caller không truyền: ưu tiên primary AM của
   // company → AM bất kỳ → bất kỳ staff được assign company. Tránh
@@ -143,6 +157,7 @@ export async function forkTemplateCore(
       starts_at: startsAt,
       ends_at: endsAt,
       status: "not_started",
+      scheduling_mode: schedulingMode,
       created_by: userId,
     })
     .select("id")
@@ -161,8 +176,13 @@ export async function forkTemplateCore(
       title: m.title,
       description: m.description,
       sort_order: m.sort_order,
-      starts_at: addDays(startsAt, m.offset_start_days as number),
-      ends_at: addDays(startsAt, m.offset_end_days as number),
+      // Auto: tính từ offset. Manual/rolling: NULL → PM tự set sau / không cần.
+      starts_at: isAuto && startsAt
+        ? addDays(startsAt, m.offset_start_days as number)
+        : null,
+      ends_at: isAuto && startsAt
+        ? addDays(startsAt, m.offset_end_days as number)
+        : null,
       deliverable_required: m.deliverable_required,
       status: "not_started" as const,
     }));
@@ -182,10 +202,16 @@ export async function forkTemplateCore(
   const tplTaskToTaskId = new Map<string, string>();
   if (tplTasks && tplTasks.length > 0) {
     const rows = tplTasks.map((t) => {
-      const dueIso = addDays(
-        startsAt,
-        (t.offset_days as number) + (t.duration_days as number),
-      );
+      // Auto mode: due_at tính từ offset + duration. Manual/rolling: null
+      const dueAt =
+        isAuto && startsAt
+          ? new Date(
+              addDays(
+                startsAt,
+                (t.offset_days as number) + (t.duration_days as number),
+              ),
+            ).toISOString()
+          : null;
       return {
         company_id: contract.company_id,
         project_id: project.id,
@@ -195,7 +221,7 @@ export async function forkTemplateCore(
         template_task_id: t.id,
         title: t.title,
         description: t.description,
-        due_at: new Date(dueIso).toISOString(),
+        due_at: dueAt,
         status: "todo" as const,
         priority: t.priority,
         is_visible_to_customer: t.is_visible_to_customer,

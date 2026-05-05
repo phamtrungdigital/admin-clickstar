@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Eye, EyeOff, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -137,13 +137,9 @@ function CommentRow({
             <span className="text-sm font-medium text-slate-900">
               {comment.author?.full_name ?? "(người dùng đã xoá)"}
             </span>
-            <span
-              className="text-xs text-slate-400"
-              title={format(new Date(comment.created_at), "dd/MM/yyyy HH:mm")}
-            >
-              {formatDistanceToNow(new Date(comment.created_at), {
+            <span className="text-xs text-slate-500">
+              {format(new Date(comment.created_at), "HH:mm · dd/MM/yyyy", {
                 locale: vi,
-                addSuffix: true,
               })}
             </span>
             {comment.is_internal ? (

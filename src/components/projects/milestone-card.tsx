@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import {
   Calendar,
@@ -626,12 +626,8 @@ function MilestoneComments({
                   {c.author?.full_name ?? "(không rõ)"}
                 </p>
                 <div className="flex items-center gap-2">
-                  <time
-                    className="text-[10px] text-slate-400"
-                    title={format(new Date(c.created_at), "dd/MM/yyyy HH:mm")}
-                  >
-                    {formatDistanceToNow(new Date(c.created_at), {
-                      addSuffix: true,
+                  <time className="text-[11px] text-slate-500">
+                    {format(new Date(c.created_at), "HH:mm · dd/MM/yyyy", {
                       locale: vi,
                     })}
                   </time>

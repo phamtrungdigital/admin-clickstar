@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalAction } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
+import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  isWithinEditWindow,
+} from "@/lib/mentions";
 import { logError } from "@/lib/logging";
 import {
   notifyTaskApproved,
@@ -808,6 +812,53 @@ export async function addCustomerTaskCommentAction(
 
   revalidatePath(`/tasks/${taskId}`);
   return { ok: true, data: { id: data.id } };
+}
+
+/**
+ * Update body của task comment trong window 5 phút sau khi tạo. Cả
+ * internal staff + customer đều dùng action này (RLS verify quyền).
+ * Customer được edit comment "Cho khách" của họ; internal được edit
+ * comment internal/customer của chính mình.
+ */
+export async function updateTaskCommentAction(
+  commentId: string,
+  newBody: string,
+): Promise<TaskActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
+
+  const trimmed = newBody.trim();
+  if (trimmed.length === 0 || trimmed.length > 5000) {
+    return { ok: false, message: "Nội dung không hợp lệ (1-5000 ký tự)" };
+  }
+
+  const { data: existing } = await supabase
+    .from("task_comments")
+    .select("id, author_id, task_id, created_at")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (!existing) return { ok: false, message: "Bình luận không tồn tại" };
+  if (existing.author_id !== user.id) {
+    return { ok: false, message: "Chỉ tác giả mới sửa được" };
+  }
+  if (!isWithinEditWindow(existing.created_at as string)) {
+    return {
+      ok: false,
+      message: `Quá ${COMMENT_EDIT_WINDOW_MINUTES} phút để sửa — vui lòng xoá và đăng lại`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("task_comments")
+    .update({ body: trimmed, edited_at: new Date().toISOString() })
+    .eq("id", commentId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/tasks/${existing.task_id as string}`);
+  return { ok: true };
 }
 
 /**

@@ -1,9 +1,19 @@
 import { cn } from "@/lib/utils";
 import type { TicketPriority, TicketStatus } from "@/lib/database.types";
 import {
+  TICKET_CATEGORY_OPTIONS,
   TICKET_PRIORITY_OPTIONS,
   TICKET_STATUS_OPTIONS,
 } from "@/lib/validation/tickets";
+
+type TicketCategory = "technical" | "content" | "account" | "other";
+
+const CATEGORY_TONE: Record<TicketCategory, string> = {
+  technical: "bg-sky-50 text-sky-700 ring-sky-200",
+  content: "bg-pink-50 text-pink-700 ring-pink-200",
+  account: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+  other: "bg-slate-50 text-slate-600 ring-slate-200",
+};
 
 const STATUS_TONE: Record<TicketStatus, string> = {
   new: "bg-blue-50 text-blue-700 ring-blue-200",
@@ -33,4 +43,17 @@ export function TicketPriorityBadge({ priority }: { priority: TicketPriority }) 
   const label =
     TICKET_PRIORITY_OPTIONS.find((o) => o.value === priority)?.label ?? priority;
   return <span className={cn(PILL, PRIORITY_TONE[priority])}>{label}</span>;
+}
+
+export function TicketCategoryBadge({
+  category,
+}: {
+  category: string | null;
+}) {
+  if (!category) return null;
+  const cat = category as TicketCategory;
+  const label =
+    TICKET_CATEGORY_OPTIONS.find((o) => o.value === cat)?.label ?? category;
+  const tone = CATEGORY_TONE[cat] ?? CATEGORY_TONE.other;
+  return <span className={cn(PILL, tone)}>{label}</span>;
 }

@@ -1,21 +1,27 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Eye, EyeOff, Loader2, Send } from "lucide-react";
+import { Eye, EyeOff, Loader2, Pencil, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
-import { serializeMentions } from "@/lib/mentions";
+import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  deserializeMentions,
+  isWithinEditWindow,
+  serializeMentions,
+} from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import {
   addCustomerTaskCommentAction,
   addTaskCommentAction,
+  updateTaskCommentAction,
 } from "@/app/(dashboard)/tasks/actions";
 import type { TaskCommentItem } from "@/lib/queries/tasks";
 
@@ -85,6 +91,7 @@ export function TaskCommentsThread({
               key={c.id}
               comment={c}
               isOwn={c.author_id === currentUserId}
+              currentUserId={currentUserId}
             />
           ))}
         </ul>
@@ -105,10 +112,20 @@ export function TaskCommentsThread({
 function CommentRow({
   comment,
   isOwn,
+  currentUserId,
 }: {
   comment: TaskCommentItem;
   isOwn: boolean;
+  currentUserId: string;
 }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const initial = useMemo(() => deserializeMentions(comment.body), [comment.body]);
+  const [body, setBody] = useState(initial.displayValue);
+  const [mentions, setMentions] = useState<Map<string, string>>(initial.mentions);
+  const [savingEdit, startEditTransition] = useTransition();
+
+  const editable = isOwn && isWithinEditWindow(comment.created_at);
   const initials = (comment.author?.full_name ?? "?")
     .split(" ")
     .map((p) => p[0])
@@ -116,6 +133,33 @@ function CommentRow({
     .slice(-2)
     .join("")
     .toUpperCase();
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setBody(initial.displayValue);
+    setMentions(initial.mentions);
+  };
+
+  const saveEdit = () => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    const serialized = serializeMentions(trimmed, mentions);
+    if (serialized === comment.body) {
+      setEditing(false);
+      return;
+    }
+    startEditTransition(async () => {
+      const result = await updateTaskCommentAction(comment.id, serialized);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Đã cập nhật");
+      setEditing(false);
+      router.refresh();
+    });
+  };
+
   return (
     <li
       className={cn(
@@ -142,6 +186,9 @@ function CommentRow({
                 locale: vi,
               })}
             </span>
+            {comment.edited_at && (
+              <span className="text-[10px] italic text-slate-400">đã sửa</span>
+            )}
             {comment.is_internal ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
                 <EyeOff className="h-2.5 w-2.5" />
@@ -153,11 +200,63 @@ function CommentRow({
                 Cho khách
               </span>
             )}
+            {editable && !editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="ml-auto text-slate-300 hover:text-blue-600"
+                aria-label="Sửa bình luận"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
           </div>
-          <CommentBody
-            body={comment.body}
-            className="mt-1 text-sm text-slate-700"
-          />
+          {editing ? (
+            <div className="mt-2 space-y-2">
+              <MentionTextarea
+                rows={3}
+                value={body}
+                onChange={setBody}
+                mentions={mentions}
+                onMentionsChange={setMentions}
+                disabled={savingEdit}
+                className="bg-white"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-slate-400">
+                  Sửa được trong {COMMENT_EDIT_WINDOW_MINUTES} phút sau khi gửi
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={cancelEdit}
+                    disabled={savingEdit}
+                  >
+                    Huỷ
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={saveEdit}
+                    disabled={savingEdit || !body.trim()}
+                  >
+                    {savingEdit ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : null}
+                    Lưu
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <CommentBody
+              body={comment.body}
+              currentUserId={currentUserId}
+              className="mt-1 text-sm text-slate-700"
+            />
+          )}
         </div>
       </div>
     </li>

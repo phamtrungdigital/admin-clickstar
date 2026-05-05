@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -25,7 +25,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
-import { serializeMentions } from "@/lib/mentions";
+import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  deserializeMentions,
+  isWithinEditWindow,
+  serializeMentions,
+} from "@/lib/mentions";
 import {
   Select,
   SelectContent,
@@ -42,6 +47,7 @@ import {
   addMilestoneCommentAction,
   deleteMilestoneCommentAction,
   updateMilestoneAction,
+  updateMilestoneCommentAction,
 } from "@/app/(dashboard)/projects/[id]/milestone-actions";
 import { MilestoneCompleteDialog } from "./milestone-complete-dialog";
 import { MilestoneCompletionPanel } from "./milestone-completion-panel";
@@ -617,42 +623,13 @@ function MilestoneComments({
       {comments.length > 0 && (
         <ul className="divide-y divide-slate-100">
           {comments.map((c) => (
-            <li
+            <CommentRow
               key={c.id}
-              className="flex gap-2.5 py-2 first:pt-0 last:pb-0"
-            >
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700">
-                {initials(c.author?.full_name ?? "?")}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-xs font-semibold text-slate-900">
-                    {c.author?.full_name ?? "(không rõ)"}
-                  </span>
-                  <time className="text-[10px] text-slate-400">
-                    {format(new Date(c.created_at), "HH:mm · dd/MM/yyyy", {
-                      locale: vi,
-                    })}
-                  </time>
-                  {c.author?.id === currentUserId && (
-                    <button
-                      type="button"
-                      onClick={() => remove(c.id)}
-                      className="ml-auto text-slate-300 hover:text-rose-600"
-                      aria-label="Xoá bình luận"
-                      disabled={isPending}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-                <CommentBody
-                  body={c.body}
-                  currentUserId={currentUserId}
-                  className="text-sm leading-snug text-slate-700"
-                />
-              </div>
-            </li>
+              comment={c}
+              currentUserId={currentUserId}
+              isPending={isPending}
+              onDelete={() => remove(c.id)}
+            />
           ))}
         </ul>
       )}
@@ -694,6 +671,156 @@ function initials(name: string): string {
     .map((p) => p[0])
     .join("")
     .toUpperCase();
+}
+
+function CommentRow({
+  comment,
+  currentUserId,
+  isPending,
+  onDelete,
+}: {
+  comment: MilestoneCommentItem;
+  currentUserId: string;
+  isPending: boolean;
+  onDelete: () => void;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const initial = useMemo(() => deserializeMentions(comment.body), [comment.body]);
+  const [body, setBody] = useState(initial.displayValue);
+  const [mentions, setMentions] = useState<Map<string, string>>(initial.mentions);
+  const [savingEdit, startEditTransition] = useTransition();
+
+  const isOwn = comment.author?.id === currentUserId;
+  const editable = isOwn && isWithinEditWindow(comment.created_at);
+
+  const startEdit = () => {
+    setBody(initial.displayValue);
+    setMentions(initial.mentions);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setBody(initial.displayValue);
+    setMentions(initial.mentions);
+  };
+
+  const saveEdit = () => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    const serialized = serializeMentions(trimmed, mentions);
+    if (serialized === comment.body) {
+      setEditing(false);
+      return;
+    }
+    startEditTransition(async () => {
+      const result = await updateMilestoneCommentAction(comment.id, serialized);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Đã cập nhật");
+      setEditing(false);
+      router.refresh();
+    });
+  };
+
+  return (
+    <li className="flex gap-2.5 py-2 first:pt-0 last:pb-0">
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700">
+        {initials(comment.author?.full_name ?? "?")}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-xs font-semibold text-slate-900">
+            {comment.author?.full_name ?? "(không rõ)"}
+          </span>
+          <time className="text-[10px] text-slate-400">
+            {format(new Date(comment.created_at), "HH:mm · dd/MM/yyyy", {
+              locale: vi,
+            })}
+          </time>
+          {comment.edited_at && (
+            <span className="text-[10px] italic text-slate-400">đã sửa</span>
+          )}
+          {isOwn && !editing && (
+            <div className="ml-auto flex items-center gap-1.5">
+              {editable && (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="text-slate-300 hover:text-blue-600"
+                  aria-label="Sửa bình luận"
+                  disabled={isPending}
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onDelete}
+                className="text-slate-300 hover:text-rose-600"
+                aria-label="Xoá bình luận"
+                disabled={isPending}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <div className="mt-1.5 space-y-2">
+            <MentionTextarea
+              rows={2}
+              value={body}
+              onChange={setBody}
+              mentions={mentions}
+              onMentionsChange={setMentions}
+              disabled={savingEdit}
+              className="resize-none text-sm"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-slate-400">
+                Có thể sửa trong {COMMENT_EDIT_WINDOW_MINUTES} phút sau khi gửi
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={cancelEdit}
+                  disabled={savingEdit}
+                  className="h-7 px-2 text-xs"
+                >
+                  Huỷ
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveEdit}
+                  disabled={savingEdit || !body.trim()}
+                  className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700"
+                >
+                  {savingEdit ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    "Lưu"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <CommentBody
+            body={comment.body}
+            currentUserId={currentUserId}
+            className="text-sm leading-snug text-slate-700"
+          />
+        )}
+      </div>
+    </li>
+  );
 }
 
 function Field({

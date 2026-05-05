@@ -61,6 +61,34 @@ export function serializeMentions(
   return result;
 }
 
+/**
+ * Inverse của serializeMentions — convert storage `@[Tên](uuid)` về
+ * display `@Tên` cho việc edit comment, kèm Map mention để re-serialize
+ * khi save. Dùng khi user bấm "Sửa" trên 1 comment đã có mention.
+ */
+export function deserializeMentions(storedBody: string): {
+  displayValue: string;
+  mentions: Map<string, string>;
+} {
+  const mentions = new Map<string, string>();
+  for (const m of parseMentions(storedBody)) {
+    mentions.set(m.name, m.userId);
+  }
+  return {
+    displayValue: stripMentionsToPlain(storedBody),
+    mentions,
+  };
+}
+
+/** Window cho phép user edit comment sau khi gửi (giống Slack). */
+export const COMMENT_EDIT_WINDOW_MINUTES = 5;
+
+/** Trả về true nếu comment vẫn trong window 5 phút. */
+export function isWithinEditWindow(createdAt: string | Date): boolean {
+  const t = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  return Date.now() - t.getTime() < COMMENT_EDIT_WINDOW_MINUTES * 60 * 1000;
+}
+
 /** Tách body thành segments để render React. Mỗi segment là text hoặc mention. */
 export type CommentSegment =
   | { type: "text"; text: string }

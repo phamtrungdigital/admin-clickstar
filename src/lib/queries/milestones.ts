@@ -9,6 +9,7 @@ export type MilestoneCommentItem = {
   body: string;
   created_at: string;
   updated_at: string;
+  edited_at: string | null;
   author: { id: string; full_name: string; avatar_url: string | null } | null;
 };
 
@@ -33,6 +34,7 @@ export async function listCommentsByMilestoneIds(
       body,
       created_at,
       updated_at,
+      edited_at,
       author:profiles!milestone_comments_author_id_fkey (
         id, full_name, avatar_url
       )

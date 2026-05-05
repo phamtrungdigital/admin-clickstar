@@ -360,6 +360,7 @@ export interface TaskCommentRow extends Timestamps, SoftDeletable {
   body: string;
   is_internal: boolean;
   attachments: Json;
+  edited_at: string | null;
 }
 
 export interface TicketAttachment {
@@ -379,6 +380,7 @@ export interface TicketRow extends Timestamps, SoftDeletable {
   description: string | null;
   priority: TicketPriority;
   status: TicketStatus;
+  category: "technical" | "content" | "account" | "other" | null;
   assignee_id: string | null;
   reporter_id: string | null;
   closed_at: string | null;
@@ -394,6 +396,7 @@ export interface TicketCommentRow extends Timestamps, SoftDeletable {
   body: string;
   is_internal: boolean;
   attachments: Json;
+  edited_at: string | null;
 }
 
 export interface DocumentRow extends Timestamps, SoftDeletable {

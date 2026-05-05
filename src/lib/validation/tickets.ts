@@ -10,6 +10,8 @@ const TICKET_STATUS = [
 
 const TICKET_PRIORITY = ["low", "medium", "high", "urgent"] as const;
 
+const TICKET_CATEGORY = ["technical", "content", "account", "other"] as const;
+
 const trimmed = z.string().trim();
 
 /**
@@ -34,6 +36,9 @@ export const createTicketSchema = z.object({
   description: trimmed.max(5000),
   priority: z.enum(TICKET_PRIORITY),
   status: z.enum(TICKET_STATUS),
+  category: z.enum(TICKET_CATEGORY, {
+    message: "Vui lòng chọn phân loại",
+  }),
   assignee_id: z.string().uuid().nullable(),
   attachments: z.array(ticketAttachmentSchema),
 });
@@ -70,6 +75,33 @@ export const TICKET_PRIORITY_OPTIONS: {
   { value: "medium", label: "Trung bình" },
   { value: "high", label: "Cao" },
   { value: "urgent", label: "Khẩn cấp" },
+];
+
+export const TICKET_CATEGORY_OPTIONS: {
+  value: (typeof TICKET_CATEGORY)[number];
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "technical",
+    label: "Kỹ thuật",
+    description: "Lỗi website, hosting, SSL, tốc độ tải...",
+  },
+  {
+    value: "content",
+    label: "Nội dung / SEO",
+    description: "Bài viết, hình ảnh, on-page, từ khoá...",
+  },
+  {
+    value: "account",
+    label: "Tài khoản",
+    description: "Đăng nhập, phân quyền, thông tin cá nhân...",
+  },
+  {
+    value: "other",
+    label: "Khác",
+    description: "Yêu cầu không nằm trong các nhóm trên",
+  },
 ];
 
 const NULLABLE_FIELDS = ["code", "description"] as const;

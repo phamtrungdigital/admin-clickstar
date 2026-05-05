@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  TICKET_CATEGORY_OPTIONS,
   TICKET_PRIORITY_OPTIONS,
   TICKET_STATUS_OPTIONS,
   createTicketSchema,
@@ -77,6 +78,7 @@ export function TicketForm({
       description: defaultValues?.description ?? "",
       priority: defaultValues?.priority ?? "medium",
       status: defaultValues?.status ?? "new",
+      category: defaultValues?.category ?? "technical",
       assignee_id: defaultValues?.assignee_id ?? null,
       attachments: defaultValues?.attachments ?? [],
     },
@@ -243,9 +245,42 @@ export function TicketForm({
         <div
           className={cn(
             "grid gap-4",
-            isCustomer ? "md:grid-cols-1" : "md:grid-cols-3",
+            isCustomer ? "md:grid-cols-2" : "md:grid-cols-2 lg:grid-cols-4",
           )}
         >
+          <Field label="Phân loại *" error={errors.category?.message}>
+            <Controller
+              control={control}
+              name="category"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Chọn phân loại">
+                      {(value: string | null) => {
+                        if (!value) return null;
+                        return (
+                          TICKET_CATEGORY_OPTIONS.find((o) => o.value === value)
+                            ?.label ?? value
+                        );
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TICKET_CATEGORY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div className="flex flex-col">
+                          <span>{opt.label}</span>
+                          <span className="text-[11px] text-slate-500">
+                            {opt.description}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
           <Field label="Mức ưu tiên *" error={errors.priority?.message}>
             <Controller
               control={control}

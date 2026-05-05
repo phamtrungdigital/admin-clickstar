@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/dashboard/page-header";
 import {
+  TicketCategoryBadge,
   TicketPriorityBadge,
   TicketStatusBadge,
 } from "@/components/tickets/ticket-badges";
@@ -95,6 +96,7 @@ export default async function TicketDetailPage({
       <div className="flex flex-wrap items-center gap-3">
         <TicketStatusBadge status={ticket.status} />
         <TicketPriorityBadge priority={ticket.priority} />
+        <TicketCategoryBadge category={ticket.category} />
         {ticket.code && (
           <span className="font-mono text-xs text-slate-500">{ticket.code}</span>
         )}

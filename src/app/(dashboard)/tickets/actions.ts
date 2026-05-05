@@ -18,7 +18,11 @@ import {
   type NotifyArgs,
 } from "@/lib/notifications";
 import { logError } from "@/lib/logging";
-import { stripMentionsToPlain } from "@/lib/mentions";
+import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  isWithinEditWindow,
+  stripMentionsToPlain,
+} from "@/lib/mentions";
 import { notifyMentions } from "@/lib/notifications/mentions";
 import { sendEmail } from "@/lib/email/send";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -619,6 +623,54 @@ export async function addTicketCommentAction(
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets");
   return { ok: true, data: { id: comment.id as string } };
+}
+
+/**
+ * Update body của ticket comment trong window 5 phút sau khi tạo. RLS
+ * + author check ensure chỉ author edit được. Customer edit comment
+ * công khai của họ; internal edit comment internal/public của họ.
+ */
+export async function updateTicketCommentAction(
+  commentId: string,
+  ticketId: string,
+  newBody: string,
+): Promise<TicketActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Vui lòng đăng nhập lại" };
+
+  const trimmed = newBody.trim();
+  if (trimmed.length === 0 || trimmed.length > 5000) {
+    return { ok: false, message: "Nội dung không hợp lệ (1-5000 ký tự)" };
+  }
+
+  const { data: existing } = await supabase
+    .from("ticket_comments")
+    .select("id, author_id, created_at")
+    .eq("id", commentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) return { ok: false, message: "Bình luận không tồn tại" };
+  if (existing.author_id !== user.id) {
+    return { ok: false, message: "Chỉ tác giả mới sửa được" };
+  }
+  if (!isWithinEditWindow(existing.created_at as string)) {
+    return {
+      ok: false,
+      message: `Quá ${COMMENT_EDIT_WINDOW_MINUTES} phút để sửa — vui lòng xoá và đăng lại`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("ticket_comments")
+    .update({ body: trimmed, edited_at: new Date().toISOString() })
+    .eq("id", commentId);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/tickets/${ticketId}`);
+  return { ok: true };
 }
 
 export async function softDeleteTicketCommentAction(

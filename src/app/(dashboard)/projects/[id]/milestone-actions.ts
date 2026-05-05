@@ -30,6 +30,10 @@ import {
 import { logAudit } from "@/lib/audit";
 import { logError } from "@/lib/logging";
 import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  isWithinEditWindow,
+} from "@/lib/mentions";
+import {
   notifyMilestoneCommented,
   notifyMilestoneCompleted,
   notifyMilestoneReopened,
@@ -209,6 +213,62 @@ export async function addMilestoneCommentAction(
     revalidatePath(`/projects/${ms.project_id}`);
   }
   return { ok: true, data: { id: data.id } };
+}
+
+/**
+ * Update body của comment trong window 5 phút sau khi tạo. Chỉ tác giả
+ * được edit (admin không edit hộ). Giữ nguyên audit trail qua edited_at.
+ * KHÔNG re-fire mention noti — tránh spam khi sửa typo.
+ */
+export async function updateMilestoneCommentAction(
+  commentId: string,
+  newBody: string,
+): Promise<ActionResult> {
+  const { id: userId, profile } = await getCurrentUser();
+  if (!isInternal(profile)) {
+    return { ok: false, message: "Không có quyền sửa" };
+  }
+
+  const trimmed = newBody.trim();
+  if (trimmed.length === 0 || trimmed.length > 5000) {
+    return { ok: false, message: "Nội dung không hợp lệ (1-5000 ký tự)" };
+  }
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("milestone_comments")
+    .select("id, author_id, milestone_id, created_at, body")
+    .eq("id", commentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!existing) return { ok: false, message: "Bình luận không tồn tại" };
+  if (existing.author_id !== userId) {
+    return { ok: false, message: "Chỉ tác giả mới sửa được" };
+  }
+  if (!isWithinEditWindow(existing.created_at as string)) {
+    return {
+      ok: false,
+      message: `Quá ${COMMENT_EDIT_WINDOW_MINUTES} phút để sửa — vui lòng xoá và đăng lại`,
+    };
+  }
+
+  const { error } = await supabase
+    .from("milestone_comments")
+    .update({
+      body: trimmed,
+      edited_at: new Date().toISOString(),
+    })
+    .eq("id", commentId);
+  if (error) return { ok: false, message: error.message };
+
+  // Lookup project_id để revalidate
+  const { data: ms } = await supabase
+    .from("milestones")
+    .select("project_id")
+    .eq("id", existing.milestone_id as string)
+    .maybeSingle();
+  if (ms?.project_id) revalidatePath(`/projects/${ms.project_id}`);
+  return { ok: true };
 }
 
 export async function deleteMilestoneCommentAction(

@@ -1,19 +1,27 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Loader2, Lock, Send } from "lucide-react";
+import { Loader2, Lock, Pencil, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
-import { serializeMentions } from "@/lib/mentions";
+import {
+  COMMENT_EDIT_WINDOW_MINUTES,
+  deserializeMentions,
+  isWithinEditWindow,
+  serializeMentions,
+} from "@/lib/mentions";
 import { cn } from "@/lib/utils";
-import { addTicketCommentAction } from "@/app/(dashboard)/tickets/actions";
+import {
+  addTicketCommentAction,
+  updateTicketCommentAction,
+} from "@/app/(dashboard)/tickets/actions";
 import {
   TicketAttachmentsField,
   type TicketAttachmentsFieldHandle,
@@ -136,6 +144,7 @@ export function TicketComments({
           comments.map((c) => (
             <CommentItem
               key={c.id}
+              ticketId={ticketId}
               comment={c}
               isOwn={c.author_id === currentUserId}
               attachmentUrls={attachmentUrls}
@@ -208,14 +217,26 @@ export function TicketComments({
 }
 
 function CommentItem({
+  ticketId,
   comment,
   isOwn,
   attachmentUrls,
 }: {
+  ticketId: string;
   comment: TicketCommentItem;
   isOwn: boolean;
   attachmentUrls: Record<string, string>;
 }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const initial = useMemo(
+    () => deserializeMentions(comment.body),
+    [comment.body],
+  );
+  const [editBody, setEditBody] = useState(initial.displayValue);
+  const [mentions, setMentions] = useState<Map<string, string>>(initial.mentions);
+  const [savingEdit, startEditTransition] = useTransition();
+
   const author = comment.author;
   const initials =
     (author?.full_name ?? "?")
@@ -232,6 +253,37 @@ function CommentItem({
       ? "Khách hàng"
       : null;
   const attachments = (comment.attachments as TicketAttachment[] | null) ?? [];
+  const editable = isOwn && isWithinEditWindow(comment.created_at);
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditBody(initial.displayValue);
+    setMentions(initial.mentions);
+  };
+
+  const saveEdit = () => {
+    const trimmed = editBody.trim();
+    if (!trimmed) return;
+    const serialized = serializeMentions(trimmed, mentions);
+    if (serialized === comment.body) {
+      setEditing(false);
+      return;
+    }
+    startEditTransition(async () => {
+      const result = await updateTicketCommentAction(
+        comment.id,
+        ticketId,
+        serialized,
+      );
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Đã cập nhật");
+      setEditing(false);
+      router.refresh();
+    });
+  };
 
   return (
     <li className="flex gap-3 px-6 py-4">
@@ -266,21 +318,74 @@ function CommentItem({
             </span>
           )}
           <span className="text-xs text-slate-400">
-            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", {
+            {format(new Date(comment.created_at), "HH:mm · dd/MM/yyyy", {
               locale: vi,
             })}
           </span>
-        </div>
-        <div
-          className={cn(
-            "mt-1.5 rounded-lg p-3 text-sm leading-relaxed",
-            comment.is_internal
-              ? "bg-amber-50/50 text-amber-900 ring-1 ring-inset ring-amber-100"
-              : "bg-slate-50 text-slate-800",
+          {comment.edited_at && (
+            <span className="text-[10px] italic text-slate-400">đã sửa</span>
           )}
-        >
-          <CommentBody body={comment.body} />
+          {editable && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="ml-auto text-slate-300 hover:text-blue-600"
+              aria-label="Sửa bình luận"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+        {editing ? (
+          <div className="mt-2 space-y-2">
+            <MentionTextarea
+              rows={4}
+              value={editBody}
+              onChange={setEditBody}
+              mentions={mentions}
+              onMentionsChange={setMentions}
+              disabled={savingEdit}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-400">
+                Sửa được trong {COMMENT_EDIT_WINDOW_MINUTES} phút sau khi gửi
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={cancelEdit}
+                  disabled={savingEdit}
+                >
+                  Huỷ
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveEdit}
+                  disabled={savingEdit || !editBody.trim()}
+                >
+                  {savingEdit ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : null}
+                  Lưu
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "mt-1.5 rounded-lg p-3 text-sm leading-relaxed",
+              comment.is_internal
+                ? "bg-amber-50/50 text-amber-900 ring-1 ring-inset ring-amber-100"
+                : "bg-slate-50 text-slate-800",
+            )}
+          >
+            <CommentBody body={comment.body} />
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="mt-2">
             <TicketAttachmentsDisplay

@@ -25,6 +25,12 @@ type Props = Omit<
 > & {
   value: string;
   onChange: (next: string) => void;
+  /**
+   * Map tên hiển thị → userId của các mention đã chọn từ autocomplete.
+   * Parent giữ state này để gọi `serializeMentions()` khi submit.
+   */
+  mentions: Map<string, string>;
+  onMentionsChange: (next: Map<string, string>) => void;
   /** Bật/tắt autocomplete @mention. Customer-side dùng false. */
   enableMention?: boolean;
 };
@@ -42,7 +48,16 @@ type Props = Omit<
  */
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
   function MentionTextarea(
-    { value, onChange, enableMention = true, className, onKeyDown, ...rest },
+    {
+      value,
+      onChange,
+      mentions,
+      onMentionsChange,
+      enableMention = true,
+      className,
+      onKeyDown,
+      ...rest
+    },
     ref,
   ) {
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -150,9 +165,15 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
         el?.selectionStart ?? triggerStart + 1 + query.length;
       const before = value.slice(0, triggerStart);
       const after = value.slice(caret);
-      const insert = `@[${s.full_name}](${s.id}) `;
+      // Insert dạng "@Tên " (plain) — user thấy clean. Lưu mapping
+      // tên→uuid vào mentions Map; lúc submit, parent serialize sang
+      // `@[Tên](uuid)` qua serializeMentions().
+      const insert = `@${s.full_name} `;
       const next = before + insert + after;
       onChange(next);
+      const nextMentions = new Map(mentions);
+      nextMentions.set(s.full_name, s.id);
+      onMentionsChange(nextMentions);
       closePopup();
       // Focus lại textarea + đặt caret ngay sau mention
       requestAnimationFrame(() => {

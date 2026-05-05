@@ -35,6 +35,32 @@ export function stripMentionsToPlain(body: string): string {
   return body.replace(MENTION_REGEX, (_, name) => `@${name}`);
 }
 
+/**
+ * Convert display text "@Tên" → storage format "@[Tên](uuid)".
+ *
+ * mentions Map keyed by display name → userId. Longer names được replace
+ * trước để tránh "@Phạm" match nhầm bên trong "@Phạm Văn A". Sau khi
+ * thay markup `@[Phạm Văn A](uuid)` thì substring `@Phạm` không còn xuất
+ * hiện (do có `[` chen vào sau `@`), nên tên ngắn hơn replace sau không
+ * đụng vào markup đã tạo.
+ */
+export function serializeMentions(
+  displayText: string,
+  mentions: Map<string, string>,
+): string {
+  if (mentions.size === 0) return displayText;
+  const names = Array.from(mentions.keys()).sort(
+    (a, b) => b.length - a.length,
+  );
+  let result = displayText;
+  for (const name of names) {
+    const userId = mentions.get(name);
+    if (!userId) continue;
+    result = result.split(`@${name}`).join(`@[${name}](${userId})`);
+  }
+  return result;
+}
+
 /** Tách body thành segments để render React. Mỗi segment là text hoặc mention. */
 export type CommentSegment =
   | { type: "text"; text: string }

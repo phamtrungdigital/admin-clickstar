@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
+import { serializeMentions } from "@/lib/mentions";
 import {
   Select,
   SelectContent,
@@ -572,21 +573,24 @@ function MilestoneComments({
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
+  const [mentions, setMentions] = useState<Map<string, string>>(new Map());
   const [isPending, startTransition] = useTransition();
 
   const submit = () => {
     const trimmed = body.trim();
     if (!trimmed) return;
+    const serialized = serializeMentions(trimmed, mentions);
     startTransition(async () => {
       const result = await addMilestoneCommentAction({
         milestone_id: milestoneId,
-        body: trimmed,
+        body: serialized,
       });
       if (!result.ok) {
         toast.error(result.message);
         return;
       }
       setBody("");
+      setMentions(new Map());
       toast.success("Đã đăng bình luận");
       router.refresh();
     });
@@ -658,6 +662,8 @@ function MilestoneComments({
           rows={2}
           value={body}
           onChange={setBody}
+          mentions={mentions}
+          onMentionsChange={setMentions}
           placeholder="Viết bình luận... gõ @ để tag nhân viên"
           disabled={isPending}
           className="resize-none"

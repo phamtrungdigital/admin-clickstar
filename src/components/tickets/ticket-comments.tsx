@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
+import { serializeMentions } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import { addTicketCommentAction } from "@/app/(dashboard)/tickets/actions";
 import {
@@ -54,6 +55,7 @@ export function TicketComments({
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
+  const [mentions, setMentions] = useState<Map<string, string>>(new Map());
   const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
   const [isInternalNote, setIsInternalNote] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -64,9 +66,10 @@ export function TicketComments({
       toast.error("Vui lòng nhập nội dung");
       return;
     }
+    const serialized = serializeMentions(body.trim(), mentions);
     startTransition(async () => {
       const result = await addTicketCommentAction(ticketId, {
-        body: body.trim(),
+        body: serialized,
         is_internal: isInternalUser ? isInternalNote : false,
         attachments,
       });
@@ -75,6 +78,7 @@ export function TicketComments({
         return;
       }
       setBody("");
+      setMentions(new Map());
       setAttachments([]);
       setIsInternalNote(false);
       toast.success(
@@ -151,6 +155,8 @@ export function TicketComments({
             rows={4}
             value={body}
             onChange={setBody}
+            mentions={mentions}
+            onMentionsChange={setMentions}
             onPaste={handlePaste}
             enableMention={isInternalUser}
             placeholder={

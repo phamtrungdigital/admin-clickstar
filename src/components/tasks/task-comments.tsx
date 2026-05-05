@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MentionTextarea } from "@/components/comments/mention-textarea";
 import { CommentBody } from "@/components/comments/comment-body";
+import { serializeMentions } from "@/lib/mentions";
 import { cn } from "@/lib/utils";
 import {
   addCustomerTaskCommentAction,
@@ -180,6 +181,7 @@ function CommentComposer({
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
+  const [mentions, setMentions] = useState<Map<string, string>>(new Map());
   const [isPending, startTransition] = useTransition();
 
   // Customer can only post to customer channel; internal can pick.
@@ -191,18 +193,20 @@ function CommentComposer({
       toast.error("Nội dung không được để trống");
       return;
     }
+    const serialized = serializeMentions(trimmed, mentions);
     startTransition(async () => {
       const r = canPostInternal
         ? await addTaskCommentAction(taskId, {
-            body: trimmed,
+            body: serialized,
             is_internal: targetChannel === "internal",
           })
-        : await addCustomerTaskCommentAction(taskId, trimmed);
+        : await addCustomerTaskCommentAction(taskId, serialized);
       if (!r.ok) {
         toast.error(r.message);
         return;
       }
       setBody("");
+      setMentions(new Map());
       toast.success("Đã gửi bình luận");
       router.refresh();
     });
@@ -228,6 +232,8 @@ function CommentComposer({
         }
         value={body}
         onChange={setBody}
+        mentions={mentions}
+        onMentionsChange={setMentions}
         enableMention={canPostInternal}
         className="bg-white"
       />

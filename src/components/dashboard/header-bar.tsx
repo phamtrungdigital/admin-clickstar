@@ -1,13 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import Link from "next/link";
-import { Bell, HelpCircle, Search } from "lucide-react";
+import { HelpCircle, Search } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { ClickstarLogo } from "@/components/clickstar-logo";
 import { Separator } from "@/components/ui/separator";
 import { MobileSidebarTrigger } from "./mobile-sidebar";
+import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
 import type { Audience } from "@/lib/database.types";
 
@@ -22,6 +21,7 @@ export function HeaderBar({
   avatarUrl,
   role,
   audience,
+  currentUserId,
   unreadNotifications = 0,
 }: {
   fullName: string;
@@ -29,6 +29,7 @@ export function HeaderBar({
   avatarUrl: string | null;
   role: string;
   audience: Audience;
+  currentUserId: string;
   unreadNotifications?: number;
 }) {
   const isCustomer = audience === "customer";
@@ -73,21 +74,10 @@ export function HeaderBar({
           <Search className="h-5 w-5" />
         </button>
 
-        <Link
-          href="/notifications"
-          aria-label="Thông báo"
-          className={cn(
-            "relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500",
-            "hover:bg-slate-100 hover:text-slate-700",
-          )}
-        >
-          <Bell className="h-5 w-5" />
-          {unreadNotifications > 0 && (
-            <span className="absolute right-1.5 top-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
-              {unreadNotifications > 99 ? "99+" : unreadNotifications}
-            </span>
-          )}
-        </Link>
+        <NotificationBell
+          initialCount={unreadNotifications}
+          currentUserId={currentUserId}
+        />
         <button
           type="button"
           aria-label="Trợ giúp"

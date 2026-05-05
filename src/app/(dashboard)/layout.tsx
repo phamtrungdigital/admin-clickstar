@@ -49,6 +49,7 @@ export default async function DashboardLayout({
             avatarUrl={profile?.avatar_url ?? null}
             role={role}
             audience={audience}
+            currentUserId={userId}
             unreadNotifications={unreadCount ?? 0}
           />
           <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">

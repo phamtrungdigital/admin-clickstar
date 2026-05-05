@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Bell, BellRing } from "lucide-react";
 
@@ -104,12 +104,8 @@ function NotificationRow({
           >
             {row.title}
           </p>
-          <time
-            className="flex-shrink-0 text-xs text-slate-400"
-            title={format(new Date(row.created_at), "dd/MM/yyyy HH:mm")}
-          >
-            {formatDistanceToNow(new Date(row.created_at), {
-              addSuffix: true,
+          <time className="flex-shrink-0 text-xs text-slate-400">
+            {format(new Date(row.created_at), "HH:mm · dd/MM/yyyy", {
               locale: vi,
             })}
           </time>

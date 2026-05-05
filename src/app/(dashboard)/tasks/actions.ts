@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalAction } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
+import { logError } from "@/lib/logging";
 import {
   notifyTaskApproved,
   notifyTaskAssigned,
@@ -757,7 +758,9 @@ export async function addTaskCommentAction(
     taskId,
     user.id,
     parsed.data.body,
-  ).catch((err) => console.error("[task-comment] notify failed", err));
+  ).catch(async (err) =>
+    logError("action.task_comment.notify", err, { taskId, userId: user.id }),
+  );
 
   revalidatePath(`/tasks/${taskId}`);
   return { ok: true, data: { id: data.id } };
@@ -795,8 +798,12 @@ export async function addCustomerTaskCommentAction(
     return { ok: false, message: error?.message ?? "Không gửi được bình luận" };
   }
 
-  await notifyTaskCommentRecipients(taskId, user.id, trimmed).catch((err) =>
-    console.error("[task-comment-customer] notify failed", err),
+  await notifyTaskCommentRecipients(taskId, user.id, trimmed).catch(
+    async (err) =>
+      logError("action.task_comment_customer.notify", err, {
+        taskId,
+        userId: user.id,
+      }),
   );
 
   revalidatePath(`/tasks/${taskId}`);

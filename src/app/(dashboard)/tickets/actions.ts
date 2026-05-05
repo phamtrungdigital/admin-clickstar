@@ -17,6 +17,7 @@ import {
   notify,
   type NotifyArgs,
 } from "@/lib/notifications";
+import { logError } from "@/lib/logging";
 import { stripMentionsToPlain } from "@/lib/mentions";
 import { notifyMentions } from "@/lib/notifications/mentions";
 import { sendEmail } from "@/lib/email/send";
@@ -241,7 +242,7 @@ export async function createTicketAction(
       });
     }
   } catch (err) {
-    console.error("[ticket email] ticket_created failed", err);
+    await logError("email.ticket_created", err);
   }
 
   revalidatePath("/tickets");
@@ -397,7 +398,7 @@ export async function changeTicketStatusAction(
         });
       }
     } catch (err) {
-      console.error("[ticket email] ticket_status_changed failed", err);
+      await logError("email.ticket_status_changed", err);
     }
   }
 
@@ -500,7 +501,9 @@ export async function addTicketCommentAction(
       .update({ status: "in_progress" })
       .eq("id", ticketId);
     if (stErr) {
-      console.error("[ticket-comment] auto-status update failed", stErr);
+      await logError("action.ticket_comment.auto_status", stErr, {
+        ticketId,
+      });
     }
   }
 
@@ -553,10 +556,16 @@ export async function addTicketCommentAction(
     })
   ).filter((rid) => !mentionedIds.has(rid));
 
-  // Chuông in-app: chỉ internal user mới nhận (policy product). KH
-  // không bao giờ nhận chuông cho ticket comment — họ check qua email
-  // hoặc mở portal thấy reply trong thread.
-  const chuongRecipients = await filterInternalActiveIds(recipients);
+  // Chuông in-app:
+  // - Internal note (Lock icon): CHỈ internal user nhận → filter
+  // - Public reply: tất cả recipients nhận chuông, kể cả KH reporter
+  //   (anh chốt 2026-05-05: KH cần biết khi internal reply công khai;
+  //   trước đây chỉ email không đủ vì KH không check thường xuyên)
+  // - Customer reply: recipients đã loại reporter (chính KH) → còn lại
+  //   internal stakeholders, OK ship cả chuông
+  const chuongRecipients = isInternalNote
+    ? await filterInternalActiveIds(recipients)
+    : recipients;
   const previewPlain = stripMentionsToPlain(parsed.data.body).slice(0, 200);
   const notifyArgs: NotifyArgs[] = chuongRecipients.map((rid) => ({
     user_id: rid,
@@ -603,7 +612,7 @@ export async function addTicketCommentAction(
         });
       }
     } catch (err) {
-      console.error("[ticket email] ticket_replied failed", err);
+      await logError("email.ticket_replied", err, { ticketId });
     }
   }
 

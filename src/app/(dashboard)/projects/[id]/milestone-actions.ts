@@ -28,6 +28,7 @@ import {
   type UpdateMilestoneInput,
 } from "@/lib/validation/milestones";
 import { logAudit } from "@/lib/audit";
+import { logError } from "@/lib/logging";
 import {
   notifyMilestoneCommented,
   notifyMilestoneCompleted,
@@ -195,8 +196,11 @@ export async function addMilestoneCommentAction(
           actorName: profile?.full_name || "(không rõ)",
         },
         parsed.data.body,
-      ).catch((err) => {
-        console.error("[milestone-comment] notify failed", err);
+      ).catch(async (err) => {
+        await logError("action.milestone_comment.notify", err, {
+          milestoneId: parsed.data.milestone_id,
+          userId,
+        });
       });
     }
   }
@@ -463,8 +467,11 @@ export async function completeMilestoneAction(
         attachmentsCount: parsed.data.attachments.length,
         linksCount: parsed.data.links.length,
       },
-    ).catch((err) => {
-      console.error("[milestone-complete] notify failed", err);
+    ).catch(async (err) => {
+      await logError("action.milestone_complete.notify", err, {
+        milestoneId,
+        userId,
+      });
     });
   }
 
@@ -652,8 +659,11 @@ export async function reopenMilestoneAction(
         originalCompleterId: completion.completed_by as string,
       },
       parsed.data.reason,
-    ).catch((err) => {
-      console.error("[milestone-reopen] notify failed", err);
+    ).catch(async (err) => {
+      await logError("action.milestone_reopen.notify", err, {
+        milestoneId,
+        userId,
+      });
     });
   }
 

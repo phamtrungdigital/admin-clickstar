@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/logging";
 import type { NotificationChannel } from "@/lib/database.types";
 
 export type NotifyArgs = {
@@ -39,10 +40,10 @@ export async function notify(items: NotifyArgs[]): Promise<void> {
       })),
     );
     if (error) {
-      console.error("[notifications] insert failed", error);
+      await logError("notify.insert", error, { count: items.length });
     }
   } catch (err) {
-    console.error("[notifications] unexpected error", err);
+    await logError("notify.unexpected", err, { count: items.length });
   }
 }
 
@@ -90,13 +91,15 @@ export async function filterInternalActiveIds(
       .eq("is_active", true)
       .is("deleted_at", null);
     if (error) {
-      console.error("[notifications] filterInternalActiveIds failed", error);
+      await logError("notify.filter_internal", error, { idCount: ids.length });
       return [];
     }
     const allowed = new Set((data ?? []).map((r) => r.id as string));
     return ids.filter((id) => allowed.has(id));
   } catch (err) {
-    console.error("[notifications] filterInternalActiveIds unexpected", err);
+    await logError("notify.filter_internal_unexpected", err, {
+      idCount: ids.length,
+    });
     return [];
   }
 }
@@ -114,12 +117,12 @@ async function listInternalRecipientIdsByRoles(
       .eq("is_active", true)
       .is("deleted_at", null);
     if (error) {
-      console.error("[notifications] failed to list recipients", error);
+      await logError("notify.list_recipients", error, { roles });
       return [];
     }
     return (data ?? []).map((r) => r.id);
   } catch (err) {
-    console.error("[notifications] unexpected error", err);
+    await logError("notify.list_recipients_unexpected", err, { roles });
     return [];
   }
 }

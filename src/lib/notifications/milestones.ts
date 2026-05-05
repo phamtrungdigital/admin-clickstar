@@ -2,6 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
+import { logError } from "@/lib/logging";
 import { stripMentionsToPlain } from "@/lib/mentions";
 import { filterInternalActiveIds } from "@/lib/notifications";
 import { notifyMentions } from "@/lib/notifications/mentions";
@@ -134,9 +135,15 @@ export async function notifyMilestoneCompleted(
   }));
   try {
     const { error } = await admin.from("notifications").insert(inApp);
-    if (error) console.error("[notifications/milestone] insert failed", error);
+    if (error)
+      await logError("notify.milestone_completed.insert", error, {
+        milestoneId: ctx.milestoneId,
+        recipientCount: inApp.length,
+      });
   } catch (err) {
-    console.error("[notifications/milestone] unexpected", err);
+    await logError("notify.milestone_completed.unexpected", err, {
+      milestoneId: ctx.milestoneId,
+    });
   }
 
   // 2) Email — gửi tuần tự cho ổn định, mỗi recipient 1 email.
@@ -297,9 +304,15 @@ export async function notifyMilestoneCommented(
 
   try {
     const { error } = await admin.from("notifications").insert(rows);
-    if (error) console.error("[notifications/milestone-comment] insert failed", error);
+    if (error)
+      await logError("notify.milestone_comment.insert", error, {
+        milestoneId: ctx.milestoneId,
+        recipientCount: rows.length,
+      });
   } catch (err) {
-    console.error("[notifications/milestone-comment] unexpected", err);
+    await logError("notify.milestone_comment.unexpected", err, {
+      milestoneId: ctx.milestoneId,
+    });
   }
 }
 
@@ -328,8 +341,12 @@ export async function notifyMilestoneReopened(
       entity_id: ctx.milestoneId,
     });
     if (error)
-      console.error("[notifications/milestone-reopen] insert failed", error);
+      await logError("notify.milestone_reopen.insert", error, {
+        milestoneId: ctx.milestoneId,
+      });
   } catch (err) {
-    console.error("[notifications/milestone-reopen] unexpected", err);
+    await logError("notify.milestone_reopen.unexpected", err, {
+      milestoneId: ctx.milestoneId,
+    });
   }
 }

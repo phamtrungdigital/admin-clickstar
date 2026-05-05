@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { logError } from "@/lib/logging";
 import { stripMentionsToPlain } from "@/lib/mentions";
 import { filterInternalActiveIds } from "@/lib/notifications";
 import { notifyMentions } from "@/lib/notifications/mentions";
@@ -33,9 +34,10 @@ async function insertNotifications(rows: NotificationRow[]): Promise<void> {
   try {
     const admin = createAdminClient();
     const { error } = await admin.from("notifications").insert(rows);
-    if (error) console.error("[notifications/task] insert failed", error);
+    if (error)
+      await logError("notify.task.insert", error, { count: rows.length });
   } catch (err) {
-    console.error("[notifications/task] unexpected error", err);
+    await logError("notify.task.unexpected", err, { count: rows.length });
   }
 }
 
@@ -179,7 +181,9 @@ export async function notifyTaskCommented(
       if (uid && uid !== actorId) recipients.add(uid);
     }
   } catch (err) {
-    console.error("[notifyTaskCommented] load recipients failed", err);
+    await logError("notify.task_comment.load_recipients", err, {
+      taskId: ctx.taskId,
+    });
   }
 
   // Loại bỏ user đã nhận noti @mention

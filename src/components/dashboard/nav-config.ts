@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  AlertCircle,
   LayoutDashboard,
   Users,
   FileSignature,
@@ -129,6 +130,7 @@ export const internalNav: NavItem[] = [
       { label: "Vai trò & Phân quyền", href: "/admin/roles", icon: ShieldUser },
       { label: "Cài đặt hệ thống", href: "/admin/settings", icon: Settings },
       { label: "Nhật ký hoạt động", href: "/admin/activity", icon: ListChecks },
+      { label: "Lỗi hệ thống", href: "/admin/errors", icon: AlertCircle },
       { label: "Danh mục", href: "/admin/catalog", icon: FolderOpen },
     ],
   },

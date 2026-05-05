@@ -122,9 +122,9 @@ export function MilestoneCompletionPanel({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+    <div className="space-y-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
             <CheckCircle2 className="h-4 w-4" />
           </div>
@@ -343,14 +343,15 @@ function LinkList({ links }: { links: MilestoneLink[] }) {
         {links.map((l, idx) => (
           <li
             key={idx}
-            className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm"
+            className="flex min-w-0 items-center gap-2 overflow-hidden rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm"
           >
             <Link2 className="h-4 w-4 flex-shrink-0 text-blue-600" />
             <a
               href={l.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-w-0 flex-1 truncate text-blue-700 hover:underline"
+              className="block min-w-0 flex-1 truncate text-blue-700 hover:underline"
+              title={l.label || l.url}
             >
               {l.label || l.url}
             </a>

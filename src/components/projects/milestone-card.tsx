@@ -234,7 +234,7 @@ export function MilestoneCard({
 
       {/* Expanded panel: edit form + tasks + comments */}
       {expanded && (
-        <div className="mt-3 space-y-4 rounded-lg border border-slate-200 bg-slate-50/40 p-4">
+        <div className="mt-3 space-y-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
           {/* Completion panel — hiện khi milestone đã được nghiệm thu */}
           {isCompleted && completion && (
             <MilestoneCompletionPanel

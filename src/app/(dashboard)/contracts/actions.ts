@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalAction } from "@/lib/auth/guards";
-import { forkTemplateCore } from "@/lib/projects/fork";
+import { createEmptyProject, forkTemplateCore } from "@/lib/projects/fork";
 import {
   createContractSchema,
   normalizeContractInput,
@@ -85,39 +85,49 @@ export async function createContractAction(
     }
   }
 
-  // Auto-fork: for each service line that picked a template, clone it into
-  // a project. Best-effort — if a fork fails we keep the contract and
-  // surface a partial-success message; admin can fork manually from the
-  // contract detail page.
-  const linesWithTemplate = parsed.data.services.filter(
-    (s): s is ContractServiceLineInput & { template_id: string } =>
-      typeof s.template_id === "string" && s.template_id.length > 0,
-  );
+  // Phương án C: mỗi service line tạo 1 project — có template thì fork,
+  // không template thì tạo project trống (PM thêm milestone ad-hoc sau).
+  // Đảm bảo HĐ luôn có entity track triển khai cho từng service.
+  const fallbackStartIso =
+    payload.starts_at ?? new Date().toISOString().slice(0, 10);
   const failedForks: string[] = [];
-  if (linesWithTemplate.length > 0) {
-    const fallbackStartIso =
-      payload.starts_at ?? new Date().toISOString().slice(0, 10);
-    for (const line of linesWithTemplate) {
-      const startsAt = line.starts_at?.length ? line.starts_at : fallbackStartIso;
-      // Build a project name from the service+template pair so the admin
-      // can immediately tell projects apart (a contract may host SEO + Ads
-      // forks side by side).
+  let createdCount = 0;
+
+  for (const line of parsed.data.services) {
+    const hasTemplate =
+      typeof line.template_id === "string" && line.template_id.length > 0;
+    const startsAt = line.starts_at?.length ? line.starts_at : fallbackStartIso;
+
+    if (hasTemplate) {
       const projectName = await buildProjectName(
         supabase,
         line.service_id,
-        line.template_id,
+        line.template_id as string,
         payload.name as string,
       );
       const result = await forkTemplateCore(supabase, user.id, {
         contractId: contract.id,
-        templateId: line.template_id,
+        templateId: line.template_id as string,
         name: projectName,
         startsAt,
         pmId: null,
       });
-      if (!result.ok) {
-        failedForks.push(`${projectName}: ${result.message}`);
-      }
+      if (!result.ok) failedForks.push(`${projectName}: ${result.message}`);
+      else createdCount += 1;
+    } else {
+      // Empty project — name từ service + customer
+      const emptyName = await buildEmptyProjectName(
+        supabase,
+        line.service_id,
+        payload.name as string,
+      );
+      const result = await createEmptyProject(supabase, user.id, {
+        contractId: contract.id,
+        name: emptyName,
+        // schedulingMode default 'manual' (không có template offset)
+      });
+      if (!result.ok) failedForks.push(`${emptyName}: ${result.message}`);
+      else createdCount += 1;
     }
   }
 
@@ -131,7 +141,7 @@ export async function createContractAction(
       name: payload.name,
       code: payload.code,
       status: payload.status,
-      auto_forked_projects: linesWithTemplate.length - failedForks.length,
+      auto_created_projects: createdCount,
     },
   });
 
@@ -166,6 +176,21 @@ async function buildProjectName(
   const svcName = (service?.name as string | undefined) ?? "Dịch vụ";
   const tplName = (template?.name as string | undefined) ?? "Template";
   return `${svcName} (${tplName}) — ${contractName}`;
+}
+
+/** Project name khi không có template — chỉ service + contract */
+async function buildEmptyProjectName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  serviceId: string,
+  contractName: string,
+): Promise<string> {
+  const { data: service } = await supabase
+    .from("services")
+    .select("name")
+    .eq("id", serviceId)
+    .maybeSingle();
+  const svcName = (service?.name as string | undefined) ?? "Dịch vụ";
+  return `${svcName} — ${contractName}`;
 }
 
 export async function updateContractAction(

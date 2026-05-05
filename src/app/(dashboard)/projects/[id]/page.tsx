@@ -29,6 +29,7 @@ import {
 import { SnapshotsPanel } from "@/components/snapshots/snapshots-panel";
 import { ProjectDocumentsSection } from "@/components/documents/project-documents-section";
 import { MilestoneCard } from "@/components/projects/milestone-card";
+import { AddMilestoneButton } from "@/components/projects/add-milestone-button";
 import {
   ProjectPmPicker,
   type StaffOption,
@@ -171,6 +172,7 @@ export default async function ProjectDetailPage({
             <ProgressOverview project={project} stats={stats} />
           )}
           <MilestonesSection
+            projectId={project.id}
             milestones={project.milestones}
             tasks={project.tasks}
             commentsByMilestone={commentsByMilestone}
@@ -178,6 +180,8 @@ export default async function ProjectDetailPage({
             currentUserId={userId}
             companyId={project.company?.id ?? null}
             isAdmin={isAdminLevel}
+            canManage={canManagePm}
+            schedulingMode={project.scheduling_mode}
           />
           {/* TasksPreview bỏ — phương án C, đầu việc chi tiết hiện trong
               MilestoneCard (toggle "Hiện đầu việc"). Nhân viên muốn xem
@@ -737,6 +741,7 @@ function Stat({ label, value, dot }: { label: string; value: number; dot: string
 }
 
 function MilestonesSection({
+  projectId,
   milestones,
   tasks,
   commentsByMilestone,
@@ -744,7 +749,10 @@ function MilestonesSection({
   currentUserId,
   companyId,
   isAdmin,
+  canManage,
+  schedulingMode,
 }: {
+  projectId: string;
   milestones: ProjectDetail["milestones"];
   tasks: ProjectDetail["tasks"];
   commentsByMilestone: Awaited<ReturnType<typeof listCommentsByMilestoneIds>>;
@@ -754,7 +762,13 @@ function MilestonesSection({
   currentUserId: string;
   companyId: string | null;
   isAdmin: boolean;
+  canManage: boolean;
+  schedulingMode: ProjectDetail["scheduling_mode"];
 }) {
+  // Hint: project mode manual/rolling thường có ít/0 milestone từ template
+  // → highlight nút "Thêm" cho PM
+  const showHintForEmpty =
+    milestones.length === 0 && schedulingMode !== "auto";
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <div className="mb-4 flex items-center justify-between">
@@ -764,25 +778,42 @@ function MilestonesSection({
         </span>
       </div>
       {milestones.length === 0 ? (
-        <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
-          Dự án này chưa có công việc nào.
-        </p>
+        <div className="space-y-4">
+          <p className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+            {schedulingMode === "auto"
+              ? "Dự án này chưa có công việc nào."
+              : "Dự án trống — PM thêm công việc khi triển khai."}
+          </p>
+          <AddMilestoneButton
+            projectId={projectId}
+            canManage={canManage}
+            showHint={showHintForEmpty}
+          />
+        </div>
       ) : (
-        <ol className="relative space-y-5 border-l border-slate-200 pl-6">
-          {milestones.map((m, idx) => (
-            <MilestoneCard
-              key={m.id}
-              milestone={m}
-              tasks={tasks.filter((t) => t.milestone_id === m.id)}
-              comments={commentsByMilestone.get(m.id) ?? []}
-              completion={completionsByMilestone.get(m.id) ?? null}
-              currentUserId={currentUserId}
-              companyId={companyId}
-              isAdmin={isAdmin}
-              isLast={idx === milestones.length - 1}
+        <div className="space-y-5">
+          <ol className="relative space-y-5 border-l border-slate-200 pl-6">
+            {milestones.map((m, idx) => (
+              <MilestoneCard
+                key={m.id}
+                milestone={m}
+                tasks={tasks.filter((t) => t.milestone_id === m.id)}
+                comments={commentsByMilestone.get(m.id) ?? []}
+                completion={completionsByMilestone.get(m.id) ?? null}
+                currentUserId={currentUserId}
+                companyId={companyId}
+                isAdmin={isAdmin}
+                isLast={idx === milestones.length - 1}
+              />
+            ))}
+          </ol>
+          <div className="border-t border-slate-100 pt-4">
+            <AddMilestoneButton
+              projectId={projectId}
+              canManage={canManage}
             />
-          ))}
-        </ol>
+          </div>
+        </div>
       )}
     </section>
   );

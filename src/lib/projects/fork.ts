@@ -5,6 +5,98 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { logAudit } from "@/lib/audit";
 import type { SchedulingMode } from "@/lib/database.types";
 
+export type CreateEmptyProjectInput = {
+  contractId: string;
+  name: string;
+  pmId?: string | null;
+  /** Default 'manual' — project trống, PM tự thêm milestone ad-hoc khi cần */
+  schedulingMode?: SchedulingMode;
+};
+
+/**
+ * Tạo project trống không từ template. Dùng khi service trong HĐ không
+ * chọn template (custom 100%, service đơn giản, hoặc template chưa
+ * sẵn). PM sẽ thêm milestone ad-hoc qua UI sau.
+ *
+ * Default scheduling_mode = 'manual' (không có offset từ template để
+ * tính ngày). Admin có thể đổi sau qua ProjectSchedulingModePicker.
+ */
+export async function createEmptyProject(
+  supabase: SupabaseClient,
+  userId: string,
+  input: CreateEmptyProjectInput,
+): Promise<ForkTemplateCoreResult> {
+  const { data: contract, error: cErr } = await supabase
+    .from("contracts")
+    .select("id, company_id")
+    .eq("id", input.contractId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (cErr) return { ok: false, message: cErr.message };
+  if (!contract) return { ok: false, message: "Hợp đồng không tồn tại" };
+
+  // Auto-pick PM (cùng heuristic như forkTemplateCore)
+  let resolvedPmId: string | null = input.pmId ?? null;
+  if (!resolvedPmId) {
+    const { data: primaryAm } = await supabase
+      .from("company_assignments")
+      .select("internal_user_id")
+      .eq("company_id", contract.company_id)
+      .eq("role", "account_manager")
+      .eq("is_primary", true)
+      .limit(1)
+      .maybeSingle();
+    resolvedPmId = (primaryAm?.internal_user_id as string | null) ?? null;
+    if (!resolvedPmId) {
+      const { data: anyStaff } = await supabase
+        .from("company_assignments")
+        .select("internal_user_id")
+        .eq("company_id", contract.company_id)
+        .limit(1)
+        .maybeSingle();
+      resolvedPmId = (anyStaff?.internal_user_id as string | null) ?? null;
+    }
+    if (!resolvedPmId) resolvedPmId = userId;
+  }
+
+  const { data: project, error: pErr } = await supabase
+    .from("projects")
+    .insert({
+      company_id: contract.company_id,
+      contract_id: contract.id,
+      template_id: null,
+      template_version: null,
+      pm_id: resolvedPmId,
+      name: input.name,
+      starts_at: null,
+      ends_at: null,
+      status: "not_started",
+      scheduling_mode: input.schedulingMode ?? "manual",
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+  if (pErr || !project) {
+    return { ok: false, message: pErr?.message ?? "Không tạo được dự án" };
+  }
+
+  await logAudit({
+    user_id: userId,
+    company_id: contract.company_id,
+    action: "create",
+    entity_type: "company", // chưa có "project" trong AuditEntityType
+    entity_id: project.id,
+    new_value: {
+      action: "create_empty_project",
+      project_id: project.id,
+      name: input.name,
+      scheduling_mode: input.schedulingMode ?? "manual",
+    },
+  });
+
+  return { ok: true, data: { projectId: project.id } };
+}
+
 export type ForkTemplateCoreInput = {
   contractId: string;
   templateId: string;

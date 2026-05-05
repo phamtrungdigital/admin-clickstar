@@ -17,11 +17,13 @@ function isAdminLevel(profile: ProfileRow | null): boolean {
 import {
   addMilestoneCommentSchema,
   completeMilestoneSchema,
+  createMilestoneSchema,
   reopenMilestoneSchema,
   updateMilestoneSchema,
   UNDO_WINDOW_MINUTES,
   type AddMilestoneCommentInput,
   type CompleteMilestoneInput,
+  type CreateMilestoneInput,
   type ReopenMilestoneInput,
   type UpdateMilestoneInput,
 } from "@/lib/validation/milestones";
@@ -241,6 +243,68 @@ export async function deleteMilestoneCommentAction(
     if (ms?.project_id) revalidatePath(`/projects/${ms.project_id}`);
   }
   return { ok: true };
+}
+
+// =============================================================================
+// Tạo milestone ad-hoc (cho project mode manual/rolling, không có template)
+// =============================================================================
+
+export async function createMilestoneAction(
+  input: CreateMilestoneInput,
+): Promise<ActionResult<{ id: string }>> {
+  const { id: userId, profile } = await getCurrentUser();
+  if (!isInternal(profile)) {
+    return { ok: false, message: "Không có quyền tạo công việc" };
+  }
+
+  const parsed = createMilestoneSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      fieldErrors[issue.path.join(".")] = issue.message;
+    }
+    return { ok: false, message: "Dữ liệu không hợp lệ", fieldErrors };
+  }
+
+  const supabase = await createClient();
+
+  // Tính sort_order = max + 10 (cách 10 để chèn được giữa sau này)
+  const { data: lastMilestone } = await supabase
+    .from("milestones")
+    .select("sort_order")
+    .eq("project_id", parsed.data.project_id)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextSortOrder = ((lastMilestone?.sort_order as number) ?? 0) + 10;
+
+  const { data, error } = await supabase
+    .from("milestones")
+    .insert({
+      project_id: parsed.data.project_id,
+      title: parsed.data.title,
+      description: parsed.data.description || null,
+      starts_at: parsed.data.starts_at || null,
+      ends_at: parsed.data.ends_at || null,
+      sort_order: nextSortOrder,
+      status: "not_started",
+      progress_percent: 0,
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, message: error.message };
+
+  await logAudit({
+    user_id: userId,
+    action: "create",
+    entity_type: "milestone",
+    entity_id: data.id as string,
+    new_value: { title: parsed.data.title, action: "create_adhoc" },
+  });
+
+  revalidatePath(`/projects/${parsed.data.project_id}`);
+  return { ok: true, data: { id: data.id as string } };
 }
 
 // =============================================================================

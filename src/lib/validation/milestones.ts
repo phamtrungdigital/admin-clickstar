@@ -93,3 +93,21 @@ export type ReopenMilestoneInput = z.infer<typeof reopenMilestoneSchema>;
 
 /** Số phút sau khi báo hoàn thành mà nhân viên còn được "Hoàn tác" */
 export const UNDO_WINDOW_MINUTES = 5;
+
+export const createMilestoneSchema = z.object({
+  project_id: z.string().uuid(),
+  title: z.string().trim().min(1, "Tên công việc không được trống").max(200),
+  description: z.string().trim().max(2000).optional().default(""),
+  starts_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Sai định dạng ngày")
+    .optional()
+    .nullable(),
+  ends_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Sai định dạng ngày")
+    .optional()
+    .nullable(),
+});
+
+export type CreateMilestoneInput = z.infer<typeof createMilestoneSchema>;

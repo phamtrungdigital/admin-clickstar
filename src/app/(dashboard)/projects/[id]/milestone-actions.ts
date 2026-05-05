@@ -1,11 +1,34 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { isInternal } from "@/lib/auth/guards";
 import type { ProfileRow } from "@/lib/database.types";
+
+/**
+ * Tìm Primary Account Manager của 1 KH qua company_assignments.
+ * Schema KHÔNG có companies.primary_account_manager_id — đó là field
+ * derived. Bug fix 2026-05-05: trước đây milestone-actions query bừa
+ * companies.primary_account_manager_id → SQL error 42703 → action fail
+ * "Không load được context milestone".
+ */
+async function findPrimaryAccountManagerId(
+  adminClient: SupabaseClient,
+  companyId: string | null,
+): Promise<string | null> {
+  if (!companyId) return null;
+  const { data } = await adminClient
+    .from("company_assignments")
+    .select("internal_user_id")
+    .eq("company_id", companyId)
+    .eq("role", "account_manager")
+    .eq("is_primary", true)
+    .maybeSingle();
+  return (data?.internal_user_id as string | null) ?? null;
+}
 
 function isAdminLevel(profile: ProfileRow | null): boolean {
   if (!profile || profile.audience !== "internal") return false;
@@ -161,9 +184,7 @@ export async function addMilestoneCommentAction(
       id, title, project_id,
       project:projects!milestones_project_id_fkey (
         id, name, pm_id, company_id,
-        company:companies!projects_company_id_fkey (
-          id, name, primary_account_manager_id
-        )
+        company:companies!projects_company_id_fkey ( id, name )
       )
     `,
     )
@@ -178,14 +199,14 @@ export async function addMilestoneCommentAction(
         name: string;
         pm_id: string | null;
         company_id: string;
-        company: {
-          id: string;
-          name: string;
-          primary_account_manager_id: string | null;
-        } | null;
+        company: { id: string; name: string } | null;
       } | null;
     }).project;
     if (project) {
+      const accountManagerId = await findPrimaryAccountManagerId(
+        adminClient,
+        project.company_id ?? null,
+      );
       await notifyMilestoneCommented(
         {
           milestoneId: parsed.data.milestone_id,
@@ -195,7 +216,7 @@ export async function addMilestoneCommentAction(
           companyId: project.company_id ?? null,
           companyName: project.company?.name ?? null,
           pmId: project.pm_id,
-          accountManagerId: project.company?.primary_account_manager_id ?? null,
+          accountManagerId,
           actorId: userId,
           actorName: profile?.full_name || "(không rõ)",
         },
@@ -426,16 +447,16 @@ export async function completeMilestoneAction(
       id, title, status, project_id,
       project:projects!milestones_project_id_fkey (
         id, name, pm_id, company_id,
-        company:companies!projects_company_id_fkey (
-          id, name, primary_account_manager_id
-        )
+        company:companies!projects_company_id_fkey ( id, name )
       )
     `,
     )
     .eq("id", milestoneId)
     .maybeSingle();
   if (msErr || !ms) {
-    console.error("[milestone-complete] context load failed", msErr);
+    await logError("action.milestone_complete.context_load", msErr, {
+      milestoneId,
+    });
     return { ok: false, message: "Không load được context milestone" };
   }
 
@@ -484,11 +505,7 @@ export async function completeMilestoneAction(
       name: string;
       pm_id: string | null;
       company_id: string;
-      company: {
-        id: string;
-        name: string;
-        primary_account_manager_id: string | null;
-      } | null;
+      company: { id: string; name: string } | null;
     } | null;
   }).project;
 
@@ -508,6 +525,10 @@ export async function completeMilestoneAction(
 
   // Notify PM + AM + admin (in-app + email). Non-fatal.
   if (project) {
+    const accountManagerId = await findPrimaryAccountManagerId(
+      adminClient,
+      project.company_id ?? null,
+    );
     await notifyMilestoneCompleted(
       {
         milestoneId,
@@ -517,8 +538,7 @@ export async function completeMilestoneAction(
         companyId: project.company_id ?? null,
         companyName: project.company?.name ?? null,
         pmId: project.pm_id,
-        accountManagerId:
-          project.company?.primary_account_manager_id ?? null,
+        accountManagerId,
         actorId: userId,
         actorName: profile?.full_name || "(không rõ)",
       },
@@ -665,16 +685,16 @@ export async function reopenMilestoneAction(
       id, title, project_id,
       project:projects!milestones_project_id_fkey (
         id, name, pm_id, company_id,
-        company:companies!projects_company_id_fkey (
-          id, name, primary_account_manager_id
-        )
+        company:companies!projects_company_id_fkey ( id, name )
       )
     `,
     )
     .eq("id", milestoneId)
     .single();
   if (msErr || !ms) {
-    console.error("[milestone-reopen] context load failed", msErr);
+    await logError("action.milestone_reopen.context_load", msErr, {
+      milestoneId,
+    });
     // Vẫn return OK vì revert đã thành công, chỉ skip notify
     revalidatePath(`/projects/${milestoneId}`);
     return { ok: true };
@@ -695,14 +715,14 @@ export async function reopenMilestoneAction(
       name: string;
       pm_id: string | null;
       company_id: string;
-      company: {
-        id: string;
-        name: string;
-        primary_account_manager_id: string | null;
-      } | null;
+      company: { id: string; name: string } | null;
     } | null;
   }).project;
   if (project) {
+    const accountManagerId = await findPrimaryAccountManagerId(
+      adminClient,
+      project.company_id ?? null,
+    );
     await notifyMilestoneReopened(
       {
         milestoneId,
@@ -712,8 +732,7 @@ export async function reopenMilestoneAction(
         companyId: project.company_id ?? null,
         companyName: project.company?.name ?? null,
         pmId: project.pm_id,
-        accountManagerId:
-          project.company?.primary_account_manager_id ?? null,
+        accountManagerId,
         actorId: userId,
         actorName: profile?.full_name || "(không rõ)",
         originalCompleterId: completion.completed_by as string,
